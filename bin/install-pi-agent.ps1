@@ -2,15 +2,15 @@
 .SYNOPSIS
     Bootstrap and install Pi Coding Agent on a Windows workstation.
 .DESCRIPTION
-    Self-contained. Downloads the pi-win repo from GitHub, installs Node.js,
-    Pi Coding Agent, Sysinternals, and Nmap. Silent/non-interactive.
-    PS 5.1 compatible. Runs as SYSTEM or elevated user.
+    Self-contained. Pre-flight checks connectivity, downloads the pi-win repo from
+    GitHub, installs Node.js, Pi Coding Agent, Sysinternals, and Nmap.
+    Silent/non-interactive. PS 5.1 compatible. Runs as SYSTEM or elevated user.
 .EXAMPLE
-    # Run inline from your RMM (no file upload needed):
+    # Run inline from your RMM — no file upload needed:
     irm https://raw.githubusercontent.com/shreeve1/pi-win/main/bin/install-pi-agent.ps1 | iex
 
-    # Or if already on disk:
-    .\install-pi-agent.ps1
+    # Inject Serper API key at deploy time:
+    .\install-pi-agent.ps1 -SerperApiKey "your-key-here"
 
     # Force re-download of the repo:
     .\install-pi-agent.ps1 -Force
@@ -19,11 +19,13 @@ param(
     [string]$InstallPath  = "C:\working\pi",
     [string]$GitHubRepo   = "shreeve1/pi-win",
     [string]$Branch       = "main",
+    [string]$SerperApiKey = "",
     [switch]$SkipNode,
     [switch]$SkipNpmInstall,
     [switch]$Force
 )
 $ErrorActionPreference = "Continue"
+$skipNmap = $false
 
 function Write-Status($m) { Write-Host "[PI] $m" -ForegroundColor Cyan }
 function Write-Ok($m)     { Write-Host "[OK] $m"   -ForegroundColor Green }
@@ -45,6 +47,36 @@ Write-Status "=== Pi Agent Installer ==="
 Write-Status "User: $user | Admin: $isAdmin | System: $isSystem"
 Write-Status "Install path: $InstallPath"
 Write-Status ""
+
+# ── Pre-flight: Connectivity ──
+Write-Status "Pre-flight: Connectivity check"
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+function Test-Reachable($url) {
+    try {
+        $req = [System.Net.WebRequest]::Create($url)
+        $req.Method = "HEAD"
+        $req.Timeout = 5000
+        [void]$req.GetResponse()
+        $true
+    } catch { $false }
+}
+
+if (-not (Test-Reachable "https://github.com")) {
+    Write-Fail "Cannot reach github.com — required for repo download. Check network/proxy. Aborting."
+    exit 1
+}
+Write-Ok "github.com reachable"
+
+if (-not (Test-Reachable "https://nodejs.org")) {
+    Write-Warn "Cannot reach nodejs.org — Node.js download will be skipped."
+    $SkipNode = $true
+} else { Write-Ok "nodejs.org reachable" }
+
+if (-not (Test-Reachable "https://nmap.org")) {
+    Write-Warn "Cannot reach nmap.org — Nmap download will be skipped."
+    $skipNmap = $true
+} else { Write-Ok "nmap.org reachable" }
 
 # ── Step 0: Download repo from GitHub ──
 Write-Status "Step 0: Downloading pi-win from GitHub ($GitHubRepo @ $Branch)"
@@ -95,6 +127,21 @@ if (-not (Test-Path $InstallPath)) {
     exit 1
 }
 Write-Ok "pi-win folder ready at $InstallPath"
+
+# ── .env setup ──
+if ($SerperApiKey) {
+    $envFile = Join-Path $InstallPath ".env"
+    $existingContent = if (Test-Path $envFile) { Get-Content $envFile -Raw -ErrorAction SilentlyContinue } else { "" }
+    $hasRealKey = $existingContent -match "SERPER_API_KEY=\S+" -and $existingContent -notmatch "REPLACE_WITH"
+    if (-not $hasRealKey) {
+        $lines = if (Test-Path $envFile) { @(Get-Content $envFile -ErrorAction SilentlyContinue) } else { @() }
+        $lines = @($lines | Where-Object { $_ -notmatch "^SERPER_API_KEY=" }) + "SERPER_API_KEY=$SerperApiKey"
+        $lines | Out-File -FilePath $envFile -Encoding UTF8
+        Write-Ok ".env written with SERPER_API_KEY (other keys preserved)"
+    } else {
+        Write-Ok ".env already has a key — skipping (use -Force to overwrite)"
+    }
+}
 
 # ── Step 1: Node.js ──
 if (-not $SkipNode) {
@@ -165,7 +212,9 @@ else { Write-Warn "download-tools.ps1 not found at $dl" }
 # ── Step 3b: Nmap (portable zip, no installer) ──
 Write-Status "Step 3b: Nmap"
 $nmapDir = Join-Path $InstallPath "bin\nmap"
-if (Test-Path (Join-Path $nmapDir "nmap.exe")) {
+if ($skipNmap) {
+    Write-Warn "Nmap skipped — nmap.org unreachable"
+} elseif (Test-Path (Join-Path $nmapDir "nmap.exe")) {
     Write-Ok "Nmap already present"
 } else {
     # 7.92 portable zip — NSIS installer (/S) hangs under SYSTEM; zip is extract-and-run
