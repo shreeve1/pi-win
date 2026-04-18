@@ -9,8 +9,12 @@
     # Run inline from your RMM — no file upload needed:
     irm https://raw.githubusercontent.com/shreeve1/pi-win/main/bin/install-pi-agent.ps1 | iex
 
-    # Inject Serper API key at deploy time:
-    .\install-pi-agent.ps1 -SerperApiKey "your-key-here"
+    # Fill in keys directly in the param defaults (recommended for RMM paste-deploy):
+    #   [string]$ModelApiKey  = "your-llm-key-here"
+    #   [string]$SerperApiKey = "your-serper-key-here"
+
+    # Or pass at runtime:
+    .\install-pi-agent.ps1 -ModelApiKey "your-llm-key" -SerperApiKey "your-serper-key"
 
     # Force re-download of the repo:
     .\install-pi-agent.ps1 -Force
@@ -19,7 +23,8 @@ param(
     [string]$InstallPath  = "C:\working\pi",
     [string]$GitHubRepo   = "shreeve1/pi-win",
     [string]$Branch       = "main",
-    [string]$SerperApiKey = "",
+    [string]$ModelApiKey  = "",   # ← FILL IN before pasting into RMM (LLM provider key → auth.json)
+    [string]$SerperApiKey = "",   # ← FILL IN before pasting into RMM (Serper web search → .env)
     [switch]$SkipNode,
     [switch]$SkipNpmInstall,
     [switch]$Force
@@ -128,7 +133,18 @@ if (-not (Test-Path $InstallPath)) {
 }
 Write-Ok "pi-win folder ready at $InstallPath"
 
-# ── .env setup ──
+# ── auth.json setup (LLM provider key) ──
+if ($ModelApiKey) {
+    $authFile = Join-Path $InstallPath "auth.json"
+    if (-not (Test-Path $authFile) -or $Force) {
+        @{ zai = @{ type = "api_key"; key = $ModelApiKey } } | ConvertTo-Json -Depth 3 | Out-File -FilePath $authFile -Encoding UTF8
+        Write-Ok "auth.json written with model API key"
+    } else {
+        Write-Ok "auth.json already exists — skipping (use -Force to overwrite)"
+    }
+}
+
+# ── .env setup (Serper web search key) ──
 if ($SerperApiKey) {
     $envFile = Join-Path $InstallPath ".env"
     $existingContent = if (Test-Path $envFile) { Get-Content $envFile -Raw -ErrorAction SilentlyContinue } else { "" }
