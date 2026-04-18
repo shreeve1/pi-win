@@ -57,7 +57,7 @@ Verification output is written to `artifacts/investigations/install-log.md`.
 | File | Purpose |
 |------|---------|
 | `settings.json` | Shell path, model, theme, extension loader |
-| `models.json` | z.ai provider with GLM 4.7 Flash / GLM 5 / GLM 5.1 |
+| `models.json` | AI provider and model definitions (swap to any compatible provider) |
 | `auth.json` | Encrypted API key (gitignored) |
 | `.env` | `SERPER_API_KEY` for web search (gitignored) |
 | `agents/investigator.md` | Custom agent: Windows diagnostics expert, read-only phase 1 |
