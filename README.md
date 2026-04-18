@@ -1,6 +1,6 @@
 # pi-win
 
-A [pi coding agent](https://github.com/mariozechner/pi-coding-agent) harness for running AI-assisted diagnostics and remediation on Windows workstations — silently, in the background, via VSA 9 Live Connect.
+A [pi coding agent](https://github.com/mariozechner/pi-coding-agent) harness for running AI-assisted diagnostics and remediation on Windows workstations — silently, in the background, via any RMM tool.
 
 ## What It Does
 
@@ -17,7 +17,7 @@ The agent follows a strict 4-phase workflow:
 
 ## Deployment
 
-Upload the `pi-win` folder to `C:\ita\pi\` on the target machine via Live Connect Files, then run the installer:
+Deploy the `pi-win` folder to `C:\ita\pi\` on the target machine via your RMM's file transfer capability, then run the installer:
 
 ```powershell
 cd C:\ita\pi\bin; .\install-pi-agent.ps1
