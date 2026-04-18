@@ -17,10 +17,29 @@ The agent follows a strict 4-phase workflow:
 
 ## Deployment
 
-Deploy the `pi-win` folder to `C:\working\pi\` on the target machine via your RMM's file transfer capability, then run the installer:
+Run this one-liner from your RMM's inline script runner — no file upload needed:
+
+```powershell
+irm https://raw.githubusercontent.com/shreeve1/pi-win/main/bin/install-pi-agent.ps1 | iex
+```
+
+To inject a Serper API key at deploy time:
+
+```powershell
+$s = irm https://raw.githubusercontent.com/shreeve1/pi-win/main/bin/install-pi-agent.ps1
+& ([scriptblock]::Create($s)) -SerperApiKey "your-key-here"
+```
+
+Or if you prefer to deploy the folder manually first:
 
 ```powershell
 cd C:\working\pi\bin; .\install-pi-agent.ps1
+```
+
+To update an existing install (preserves `artifacts/` and `.env`, skips Node/npm):
+
+```powershell
+C:\working\pi\bin\update-pi.ps1
 ```
 
 The installer handles:
