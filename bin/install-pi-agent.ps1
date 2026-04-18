@@ -23,8 +23,9 @@ param(
     [string]$InstallPath  = "C:\working\pi",
     [string]$GitHubRepo   = "shreeve1/pi-win",
     [string]$Branch       = "main",
-    [string]$ModelApiKey  = "",   # ← FILL IN before pasting into RMM (LLM provider key → auth.json)
-    [string]$SerperApiKey = "",   # ← FILL IN before pasting into RMM (Serper web search → .env)
+    [string]$ModelProvider = "zai",  # ← provider name (zai, openai, anthropic, etc.)
+    [string]$ModelApiKey  = "",      # ← FILL IN before pasting into RMM (LLM provider key → auth.json)
+    [string]$SerperApiKey = "",      # ← FILL IN before pasting into RMM (Serper web search → .env)
     [switch]$SkipNode,
     [switch]$SkipNpmInstall,
     [switch]$Force
@@ -137,7 +138,7 @@ Write-Ok "pi-win folder ready at $InstallPath"
 if ($ModelApiKey) {
     $authFile = Join-Path $InstallPath "auth.json"
     if (-not (Test-Path $authFile) -or $Force) {
-        @{ zai = @{ type = "api_key"; key = $ModelApiKey } } | ConvertTo-Json -Depth 3 | Out-File -FilePath $authFile -Encoding UTF8
+        @{ $ModelProvider = @{ type = "api_key"; key = $ModelApiKey } } | ConvertTo-Json -Depth 3 | Out-File -FilePath $authFile -Encoding UTF8
         Write-Ok "auth.json written with model API key"
     } else {
         Write-Ok "auth.json already exists — skipping (use -Force to overwrite)"
