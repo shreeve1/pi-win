@@ -77,6 +77,26 @@ Verification output is written to `artifacts/investigations/install-log.md`.
 |------|---------|
 | `settings.json` | Shell path, model, theme, extension loader |
 | `models.json` | AI provider and model definitions (swap to any compatible provider) |
+
+To use a different AI provider, add an entry to `models.json` and update `settings.json`:
+
+```json
+// models.json — add alongside the existing provider
+"openai": {
+  "baseUrl": "https://api.openai.com/v1",
+  "api": "openai-chat",
+  "apiKey": "OPENAI_API_KEY",
+  "models": [{ "id": "gpt-4o", "name": "GPT-4o", ... }]
+}
+```
+
+```json
+// settings.json — point to the new provider and model
+"defaultProvider": "openai",
+"defaultModel": "gpt-4o"
+```
+
+Then deploy with `-ModelProvider openai -ModelApiKey "your-key"` so `auth.json` is written correctly.
 | `auth.json` | Encrypted API key (gitignored) |
 | `.env` | `SERPER_API_KEY` for web search (gitignored) |
 | `agents/investigator.md` | Custom agent: Windows diagnostics expert, read-only phase 1 |
