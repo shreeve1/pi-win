@@ -1,0 +1,15 @@
+# Credentials
+auth.json
+.env
+
+# Investigation artifacts (client-specific)
+artifacts/
+
+# Node modules
+node_modules/
+extensions/*/node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,7 @@
+{
+  "name": "web-fetch",
+  "version": "1.0.0",
+  "description": "Lightweight web search and fetch for Pi investigation agent",
+  "main": "index.ts",
+  "dependencies": {}
+}

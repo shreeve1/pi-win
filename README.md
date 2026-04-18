@@ -17,10 +17,10 @@ The agent follows a strict 4-phase workflow:
 
 ## Deployment
 
-Deploy the `pi-win` folder to `C:\ita\pi\` on the target machine via your RMM's file transfer capability, then run the installer:
+Deploy the `pi-win` folder to `C:\working\pi\` on the target machine via your RMM's file transfer capability, then run the installer:
 
 ```powershell
-cd C:\ita\pi\bin; .\install-pi-agent.ps1
+cd C:\working\pi\bin; .\install-pi-agent.ps1
 ```
 
 The installer handles:

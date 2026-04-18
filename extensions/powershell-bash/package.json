@@ -1,0 +1,10 @@
+{
+  "name": "powershell-bash",
+  "version": "1.0.0",
+  "description": "Overrides the built-in bash tool to use PowerShell on Windows",
+  "main": "index.ts",
+  "dependencies": {},
+  "devDependencies": {
+    "@mariozechner/pi-coding-agent": "^0.56.0"
+  }
+}
