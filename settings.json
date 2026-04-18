@@ -1,0 +1,14 @@
+{
+  "lastChangelogVersion": "0.67.1",
+  "defaultProvider": "zai",
+  "defaultModel": "glm-5.1",
+  "defaultThinkingLevel": "high",
+  "quietStartup": true,
+  "skills": [],
+  "theme": "ember",
+  "hideThinkingBlock": false,
+  "transport": "sse",
+  "shellPath": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+  "shellArgs": ["-NoProfile", "-Command"],
+  "extensions": ["+extensions/powershell-bash/index.ts", "+extensions/web-fetch/index.ts"]
+}
