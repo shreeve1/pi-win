@@ -6,10 +6,10 @@
     while preserving artifacts/ and .env. Safe to run mid-session.
 .EXAMPLE
     .\update-pi.ps1
-    .\update-pi.ps1 -InstallPath "C:\working\pi" -Branch "main"
+    .\update-pi.ps1 -InstallPath "C:\ProgramData\pi-win" -Branch "main"
 #>
 param(
-    [string]$InstallPath = "C:\working\pi",
+    [string]$InstallPath = "C:\ProgramData\pi-win",
     [string]$GitHubRepo  = "shreeve1/pi-win",
     [string]$Branch      = "main"
 )
@@ -77,7 +77,7 @@ try {
     }
 
     Write-Status ""
-    Write-Ok "UPDATE COMPLETE — artifacts/ and .env preserved"
+    Write-Ok "UPDATE COMPLETE - artifacts/ and .env preserved"
     Write-Host "  cd $InstallPath ; pi" -ForegroundColor White
 
 } catch {

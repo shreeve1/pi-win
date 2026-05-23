@@ -18,7 +18,7 @@ if ($myTemp) {
 } else { Write-Host "No temp files to clean" }
 
 # Check for stray downloads in common locations
-@("$env:TEMP", "C:\working\pi\bin") | ForEach-Object {
+@("$env:TEMP", "C:\ProgramData\pi-win\bin") | ForEach-Object {
     $stray = Get-ChildItem $_ -Filter "*.msi" -ErrorAction SilentlyContinue
     $stray += Get-ChildItem $_ -Filter "nmap*.zip" -ErrorAction SilentlyContinue
     if ($stray) { $stray | Remove-Item -Force -ErrorAction SilentlyContinue; Write-Host "Removed stray: $($stray.Name)" }
@@ -75,12 +75,12 @@ Write-Host "Temp files: cleaned"
 Write-Host "Orphan processes: checked"
 Write-Host "Firewall rules: checked"
 Write-Host ""
-Write-Host "Artifacts preserved at: C:\working\pi\artifacts\"
+Write-Host "Artifacts preserved at: C:\ProgramData\pi-win\artifacts\"
 Write-Host "Investigation complete. Safe to disconnect."
 ```
 
 ## Notes
-- NEVER delete anything in C:\working\pi\artifacts\ -- those are the investigation deliverables
+- NEVER delete anything in C:\ProgramData\pi-win\artifacts\ -- those are the investigation deliverables
 - NEVER kill the pi agent process itself
 - NEVER revert remediation changes that were APPROVED -- only clean up diagnostic state
 - If investigation was aborted mid-Phase 4, document what was changed and what still needs rollback

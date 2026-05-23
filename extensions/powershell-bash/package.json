@@ -5,6 +5,6 @@
   "main": "index.ts",
   "dependencies": {},
   "devDependencies": {
-    "@mariozechner/pi-coding-agent": "^0.56.0"
+    "@earendil-works/pi-coding-agent": "^0.75.5"
   }
 }
