@@ -1,6 +1,6 @@
 # pi-win
 
-A [pi coding agent](https://github.com/mariozechner/pi-coding-agent) harness for running AI-assisted diagnostics and remediation on Windows workstations — silently, in the background, via any RMM tool.
+A [pi coding agent](https://github.com/earendil-works/pi-coding-agent) harness for running AI-assisted diagnostics and remediation on Windows workstations — silently, in the background, via any RMM tool.
 
 ## What It Does
 
@@ -33,23 +33,47 @@ $s = irm https://raw.githubusercontent.com/shreeve1/pi-win/main/bin/install-pi-a
 Or if you prefer to deploy the folder manually first:
 
 ```powershell
-cd C:\working\pi\bin; .\install-pi-agent.ps1
+cd C:\ProgramData\pi-win\bin; .\install-pi-agent.ps1
 ```
 
 To update an existing install (preserves `artifacts/` and `.env`, skips Node/npm):
 
 ```powershell
-C:\working\pi\bin\update-pi.ps1
+C:\ProgramData\pi-win\bin\update-pi.ps1
 ```
 
 The installer handles:
 - Node.js 22.14.0 LTS (silent MSI)
-- `@mariozechner/pi-coding-agent` (global npm)
+- `@earendil-works/pi-coding-agent` (global npm)
 - Sysinternals toolkit (9 tools, ~3.9 MB)
 - Nmap 7.92 portable (~22 MB zip, no installer, no registry)
 - Web search extension (requires `SERPER_API_KEY` in `.env`)
 
 Verification output is written to `artifacts/investigations/install-log.md`.
+
+## Dual-Access Deploy
+
+RMM jobs running as `NT AUTHORITY\SYSTEM` and admins in an elevated RDP PowerShell session use the same install at `C:\ProgramData\pi-win`.
+
+For RMM tools that allow profiles, invoke Pi from any directory:
+
+```powershell
+powershell.exe -ExecutionPolicy Bypass -Command "pi"
+```
+
+If an RMM tool forces `-NoProfile`, the profile wrapper cannot load. Use an explicit install-dir hop instead:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Set-Location 'C:\ProgramData\pi-win'; pi"
+```
+
+For admin access, RDP to the workstation, open an elevated PowerShell session, then run:
+
+```powershell
+pi
+```
+
+The installer sets `PI_CODING_AGENT_DIR` machine-wide to `C:\ProgramData\pi-win`, so SYSTEM and elevated admin sessions share the same `auth.json`, skills, extensions, and artifacts. It also writes `C:\ProgramData\pi-win\AGENTS.md` from the repo's `CLAUDE.md`; this install-only file is not kept in the project repo. The AllUsersAllHosts PowerShell profile wrapper in `$PsHome\Profile.ps1` temporarily changes into the install directory before calling `pi.cmd`, which lets `AGENTS.md` load even when `pi` is started from another directory.
 
 ## Skills
 

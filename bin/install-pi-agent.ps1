@@ -6,7 +6,7 @@
     GitHub, installs Node.js, Pi Coding Agent, Sysinternals, and Nmap.
     Silent/non-interactive. PS 5.1 compatible. Runs as SYSTEM or elevated user.
 .EXAMPLE
-    # Run inline from your RMM — no file upload needed:
+    # Run inline from your RMM - no file upload needed:
     irm https://raw.githubusercontent.com/shreeve1/pi-win/main/bin/install-pi-agent.ps1 | iex
 
     # Fill in keys directly in the param defaults (recommended for RMM paste-deploy):
@@ -20,12 +20,12 @@
     .\install-pi-agent.ps1 -Force
 #>
 param(
-    [string]$InstallPath  = "C:\working\pi",
+    [string]$InstallPath  = "C:\ProgramData\pi-win",
     [string]$GitHubRepo   = "shreeve1/pi-win",
     [string]$Branch       = "main",
-    [string]$ModelProvider = "zai",  # ← provider name (zai, openai, anthropic, etc.)
-    [string]$ModelApiKey  = "",      # ← FILL IN before pasting into RMM (LLM provider key → auth.json)
-    [string]$SerperApiKey = "",      # ← FILL IN before pasting into RMM (Serper web search → .env)
+    [string]$ModelProvider = "zai",  # provider name (zai, openai, anthropic, etc.)
+    [string]$ModelApiKey  = "",      # FILL IN before pasting into RMM (LLM provider key -> auth.json)
+    [string]$SerperApiKey = "",      # FILL IN before pasting into RMM (Serper web search -> .env)
     [switch]$SkipNode,
     [switch]$SkipNpmInstall,
     [switch]$Force
@@ -54,7 +54,7 @@ Write-Status "User: $user | Admin: $isAdmin | System: $isSystem"
 Write-Status "Install path: $InstallPath"
 Write-Status ""
 
-# ── Pre-flight: Connectivity ──
+# -- Pre-flight: Connectivity --
 Write-Status "Pre-flight: Connectivity check"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
@@ -69,27 +69,27 @@ function Test-Reachable($url) {
 }
 
 if (-not (Test-Reachable "https://github.com")) {
-    Write-Fail "Cannot reach github.com — required for repo download. Check network/proxy. Aborting."
+    Write-Fail "Cannot reach github.com - required for repo download. Check network/proxy. Aborting."
     exit 1
 }
 Write-Ok "github.com reachable"
 
 if (-not (Test-Reachable "https://nodejs.org")) {
-    Write-Warn "Cannot reach nodejs.org — Node.js download will be skipped."
+    Write-Warn "Cannot reach nodejs.org - Node.js download will be skipped."
     $SkipNode = $true
 } else { Write-Ok "nodejs.org reachable" }
 
 if (-not (Test-Reachable "https://nmap.org")) {
-    Write-Warn "Cannot reach nmap.org — Nmap download will be skipped."
+    Write-Warn "Cannot reach nmap.org - Nmap download will be skipped."
     $skipNmap = $true
 } else { Write-Ok "nmap.org reachable" }
 
-# ── Step 0: Download repo from GitHub ──
+# -- Step 0: Download repo from GitHub --
 Write-Status "Step 0: Downloading pi-win from GitHub ($GitHubRepo @ $Branch)"
 $repoReady = (Test-Path (Join-Path $InstallPath "settings.json")) -and -not $Force
 
 if ($repoReady) {
-    Write-Ok "pi-win already present at $InstallPath — skipping download (use -Force to re-download)"
+    Write-Ok "pi-win already present at $InstallPath - skipping download (use -Force to re-download)"
 } else {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     $zipUrl  = "https://github.com/$GitHubRepo/archive/refs/heads/$Branch.zip"
@@ -109,7 +109,7 @@ if ($repoReady) {
         $extracted = Get-ChildItem $tmpDir -Directory | Select-Object -First 1
         if (-not $extracted) { Write-Fail "Zip extraction produced no folder. Aborting."; exit 1 }
 
-        # Move into place — remove existing target if Force
+        # Move into place - remove existing target if Force
         if ((Test-Path $InstallPath) -and $Force) {
             Remove-Item $InstallPath -Recurse -Force -ErrorAction SilentlyContinue
         }
@@ -134,18 +134,29 @@ if (-not (Test-Path $InstallPath)) {
 }
 Write-Ok "pi-win folder ready at $InstallPath"
 
-# ── auth.json setup (LLM provider key) ──
+# Pi reads AGENTS.md from the working directory tree. Keep the repo source as
+# CLAUDE.md, but materialize AGENTS.md only in the installed agent directory.
+$sourceAgentFile = Join-Path $InstallPath "CLAUDE.md"
+$installedAgentFile = Join-Path $InstallPath "AGENTS.md"
+if (Test-Path $sourceAgentFile) {
+    Copy-Item -Path $sourceAgentFile -Destination $installedAgentFile -Force
+    Write-Ok "AGENTS.md written in install directory"
+} else {
+    Write-Warn "CLAUDE.md not found; AGENTS.md not written"
+}
+
+# -- auth.json setup (LLM provider key) --
 if ($ModelApiKey) {
     $authFile = Join-Path $InstallPath "auth.json"
     if (-not (Test-Path $authFile) -or $Force) {
         @{ $ModelProvider = @{ type = "api_key"; key = $ModelApiKey } } | ConvertTo-Json -Depth 3 | Out-File -FilePath $authFile -Encoding UTF8
         Write-Ok "auth.json written with model API key"
     } else {
-        Write-Ok "auth.json already exists — skipping (use -Force to overwrite)"
+        Write-Ok "auth.json already exists - skipping (use -Force to overwrite)"
     }
 }
 
-# ── .env setup (Serper web search key) ──
+# -- .env setup (Serper web search key) --
 if ($SerperApiKey) {
     $envFile = Join-Path $InstallPath ".env"
     $existingContent = if (Test-Path $envFile) { Get-Content $envFile -Raw -ErrorAction SilentlyContinue } else { "" }
@@ -156,11 +167,11 @@ if ($SerperApiKey) {
         $lines | Out-File -FilePath $envFile -Encoding UTF8
         Write-Ok ".env written with SERPER_API_KEY (other keys preserved)"
     } else {
-        Write-Ok ".env already has a key — skipping (use -Force to overwrite)"
+        Write-Ok ".env already has a key - skipping (use -Force to overwrite)"
     }
 }
 
-# ── Step 1: Node.js ──
+# -- Step 1: Node.js --
 if (-not $SkipNode) {
     Write-Status "Step 1: Node.js"
     Refresh-Path
@@ -196,16 +207,16 @@ if (-not $SkipNode) {
     else { Write-Fail "npm missing"; exit 1 }
 } else { Write-Status "Step 1: Skipped" }
 
-# ── Step 2: Pi Coding Agent ──
+# -- Step 2: Pi Coding Agent --
 if (-not $SkipNpmInstall) {
     Write-Status "Step 2: Pi Coding Agent"
-    $out = npm install -g @mariozechner/pi-coding-agent 2>&1
+    $out = npm install -g @earendil-works/pi-coding-agent 2>&1
     if ($LASTEXITCODE -ne 0) {
         Write-Warn "npm failed (exit $LASTEXITCODE), trying --force..."
-        npm install -g @mariozechner/pi-coding-agent --force 2>&1
+        npm install -g @earendil-works/pi-coding-agent --force 2>&1
     }
     Refresh-Path
-    # Ensure npm global prefix is on Machine PATH — under SYSTEM context npm writes
+    # Ensure npm global prefix is on Machine PATH - under SYSTEM context npm writes
     # to SYSTEM's User PATH which is invisible to real logged-on users.
     $npmPrefix = (npm config get prefix 2>$null).Trim()
     if ($npmPrefix -and (Test-Path $npmPrefix)) {
@@ -217,24 +228,46 @@ if (-not $SkipNpmInstall) {
         $env:PATH = "$npmPrefix;$env:PATH"
     }
     if (Test-Cmd pi) { Write-Ok "pi command available" }
-    else { Write-Warn "pi not in PATH — open new shell to use" }
+    else { Write-Warn "pi not in PATH - open new shell to use" }
 } else { Write-Status "Step 2: Skipped" }
 
-# ── Step 3: Sysinternals ──
+$profilePath = Join-Path $PsHome "Profile.ps1"
+$profileHasPiWrapper = (Test-Path $profilePath) -and (Select-String -Path $profilePath -Pattern 'function\s+pi\s*\{' -Quiet -ErrorAction SilentlyContinue)
+if (-not $profileHasPiWrapper) {
+    $profileBlock = @'
+# pi-win: run pi from the machine-wide agent directory so AGENTS.md loads.
+function pi {
+    $piInstallPath = [System.Environment]::GetEnvironmentVariable("PI_CODING_AGENT_DIR", "Machine")
+    if (-not $piInstallPath) { $piInstallPath = "C:\ProgramData\pi-win" }
+    Push-Location $piInstallPath
+    try {
+        pi.cmd @args
+    } finally {
+        Pop-Location
+    }
+}
+'@
+    Add-Content -Path $profilePath -Value $profileBlock -Encoding UTF8
+    Write-Ok "PowerShell all-users profile wraps pi at $profilePath"
+} else {
+    Write-Ok "PowerShell all-users profile already wraps pi"
+}
+
+# -- Step 3: Sysinternals --
 Write-Status "Step 3: Sysinternals"
 $dl = Join-Path $InstallPath "bin\download-tools.ps1"
 if (Test-Path $dl) { & $dl -Destination (Join-Path $InstallPath "bin") }
 else { Write-Warn "download-tools.ps1 not found at $dl" }
 
-# ── Step 3b: Nmap (portable zip, no installer) ──
+# -- Step 3b: Nmap (portable zip, no installer) --
 Write-Status "Step 3b: Nmap"
 $nmapDir = Join-Path $InstallPath "bin\nmap"
 if ($skipNmap) {
-    Write-Warn "Nmap skipped — nmap.org unreachable"
+    Write-Warn "Nmap skipped - nmap.org unreachable"
 } elseif (Test-Path (Join-Path $nmapDir "nmap.exe")) {
     Write-Ok "Nmap already present"
 } else {
-    # 7.92 portable zip — NSIS installer (/S) hangs under SYSTEM; zip is extract-and-run
+    # 7.92 portable zip - NSIS installer (/S) hangs under SYSTEM; zip is extract-and-run
     $nmapUrl = "https://nmap.org/dist/nmap-7.92-win32.zip"
     $nmapZip = Join-Path $env:TEMP "nmap.zip"
     try {
@@ -261,7 +294,7 @@ if ($skipNmap) {
     }
 }
 
-# ── Step 3c: Web extension check ──
+# -- Step 3c: Web extension check --
 Write-Status "Step 3c: Web extension"
 $extDir = Join-Path $InstallPath "extensions\web-fetch"
 if (Test-Path (Join-Path $extDir "index.ts")) {
@@ -272,9 +305,9 @@ if (Test-Path $envFile) {
     if ((Get-Content $envFile -ErrorAction SilentlyContinue | Select-String "REPLACE_WITH").Count -gt 0) {
         Write-Warn "SERPER_API_KEY not set. Edit .env to enable web_search."
     }
-} else { Write-Warn ".env missing — web_search unavailable" }
+} else { Write-Warn ".env missing - web_search unavailable" }
 
-# ── Step 4: Verify ──
+# -- Step 4: Verify --
 Write-Status "Step 4: Verification"
 Write-Status "============================="
 $ok = $true
