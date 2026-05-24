@@ -64,6 +64,11 @@ function Refresh-Path {
 }
 function Test-Cmd($n) { try { Get-Command $n -ErrorAction Stop | Out-Null; $true } catch { $false } }
 
+function Write-Utf8NoBom($Path, $Content) {
+    $encoding = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($Path, $Content, $encoding)
+}
+
 function Read-DotEnv($Path) {
     $values = @{}
     if (-not (Test-Path $Path)) { return $values }
@@ -270,7 +275,7 @@ if ($ModelApiKey) {
 
     if ($authShouldWrite) {
         $authObject[$ModelProvider] = @{ type = "api_key"; key = $ModelApiKey }
-        $authObject | ConvertTo-Json -Depth 5 | Out-File -FilePath $authFile -Encoding UTF8
+        Write-Utf8NoBom $authFile ($authObject | ConvertTo-Json -Depth 5)
         Write-Ok "auth.json written with model API key"
     } else {
         Write-Ok "auth.json already has $ModelProvider key - skipping (use -ForceAuth to overwrite key only, or -Force to reinstall)"
