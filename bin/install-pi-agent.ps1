@@ -16,6 +16,15 @@
     # Or pass at runtime:
     .\install-pi-agent.ps1 -ModelApiKey "your-llm-key" -SerperApiKey "your-serper-key"
 
+    # Or pass a model key in one line from RMM:
+    $s = irm https://raw.githubusercontent.com/shreeve1/pi-win/main/bin/install-pi-agent.ps1; & ([scriptblock]::Create($s)) -ModelProvider "zai" -ModelApiKey "your-llm-key"
+
+    # Or load keys from a local .env file:
+    #   MODEL_PROVIDER=zai
+    #   MODEL_API_KEY=your-llm-key
+    #   SERPER_API_KEY=your-serper-key
+    .\install-pi-agent.ps1 -EnvFile "C:\ProgramData\pi-win\.env"
+
     # Force re-download of the repo:
     .\install-pi-agent.ps1 -Force
 #>
@@ -26,6 +35,7 @@ param(
     [string]$ModelProvider = "zai",  # provider name (zai, openai, anthropic, etc.)
     [string]$ModelApiKey  = "",      # FILL IN before pasting into RMM (LLM provider key -> auth.json)
     [string]$SerperApiKey = "",      # FILL IN before pasting into RMM (Serper web search -> .env)
+    [string]$EnvFile      = "",      # Optional .env file with MODEL_PROVIDER, MODEL_API_KEY, SERPER_API_KEY
     [switch]$SkipNode,
     [switch]$SkipNpmInstall,
     [switch]$Force
@@ -43,6 +53,36 @@ function Refresh-Path {
                 [System.Environment]::GetEnvironmentVariable("PATH","User")
 }
 function Test-Cmd($n) { try { Get-Command $n -ErrorAction Stop | Out-Null; $true } catch { $false } }
+
+function Read-DotEnv($Path) {
+    $values = @{}
+    if (-not (Test-Path $Path)) { return $values }
+
+    foreach ($rawLine in (Get-Content $Path -ErrorAction SilentlyContinue)) {
+        $line = $rawLine.Trim()
+        if (-not $line -or $line.StartsWith("#")) { continue }
+        if ($line.StartsWith("export ")) { $line = $line.Substring(7).Trim() }
+
+        $equalsIndex = $line.IndexOf("=")
+        if ($equalsIndex -lt 1) { continue }
+
+        $key = $line.Substring(0, $equalsIndex).Trim()
+        $value = $line.Substring($equalsIndex + 1).Trim()
+        if ($key -notmatch '^[A-Za-z_][A-Za-z0-9_]*$') { continue }
+
+        if ($value.Length -ge 2) {
+            $first = $value.Substring(0, 1)
+            $last = $value.Substring($value.Length - 1, 1)
+            if (($first -eq '"' -and $last -eq '"') -or ($first -eq "'" -and $last -eq "'")) {
+                $value = $value.Substring(1, $value.Length - 2)
+            }
+        }
+
+        $values[$key] = $value
+    }
+
+    return $values
+}
 
 # Detect context
 $isAdmin  = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -145,14 +185,85 @@ if (Test-Path $sourceAgentFile) {
     Write-Warn "CLAUDE.md not found; AGENTS.md not written"
 }
 
+# -- .env setup (local deploy secrets) --
+$activeEnvFile = if ($EnvFile) { $EnvFile } else { Join-Path $InstallPath ".env" }
+$envValues = @{}
+if (Test-Path $activeEnvFile) {
+    $envValues = Read-DotEnv $activeEnvFile
+    $loadedEnvKeys = @()
+
+    if ($envValues.ContainsKey("MODEL_PROVIDER") -and $envValues["MODEL_PROVIDER"] -and -not $PSBoundParameters.ContainsKey("ModelProvider")) {
+        $ModelProvider = $envValues["MODEL_PROVIDER"]
+        $loadedEnvKeys += "MODEL_PROVIDER"
+    }
+
+    if (-not $ModelApiKey) {
+        if ($envValues.ContainsKey("MODEL_API_KEY") -and $envValues["MODEL_API_KEY"]) {
+            $ModelApiKey = $envValues["MODEL_API_KEY"]
+            $loadedEnvKeys += "MODEL_API_KEY"
+        } else {
+            $providerKeyName = (($ModelProvider.ToUpperInvariant() -replace '[^A-Z0-9]', '_') + "_API_KEY")
+            if ($envValues.ContainsKey($providerKeyName) -and $envValues[$providerKeyName]) {
+                $ModelApiKey = $envValues[$providerKeyName]
+                $loadedEnvKeys += $providerKeyName
+            }
+        }
+    }
+
+    if ((-not $SerperApiKey) -and $envValues.ContainsKey("SERPER_API_KEY") -and $envValues["SERPER_API_KEY"]) {
+        $SerperApiKey = $envValues["SERPER_API_KEY"]
+        $loadedEnvKeys += "SERPER_API_KEY"
+    }
+
+    if ($loadedEnvKeys.Count -gt 0) {
+        Write-Ok ".env loaded from $activeEnvFile ($($loadedEnvKeys -join ', '))"
+    } else {
+        Write-Ok ".env loaded from $activeEnvFile"
+    }
+} elseif ($EnvFile) {
+    Write-Warn ".env file not found at $EnvFile"
+}
+
 # -- auth.json setup (LLM provider key) --
 if ($ModelApiKey) {
     $authFile = Join-Path $InstallPath "auth.json"
-    if (-not (Test-Path $authFile) -or $Force) {
-        @{ $ModelProvider = @{ type = "api_key"; key = $ModelApiKey } } | ConvertTo-Json -Depth 3 | Out-File -FilePath $authFile -Encoding UTF8
+    $authShouldWrite = $Force -or -not (Test-Path $authFile)
+    $authObject = @{}
+
+    if (Test-Path $authFile) {
+        try {
+            $authText = Get-Content $authFile -Raw -ErrorAction SilentlyContinue
+            if ($authText -and $authText.Trim()) {
+                $parsedAuth = $authText | ConvertFrom-Json -ErrorAction Stop
+                foreach ($prop in $parsedAuth.PSObject.Properties) { $authObject[$prop.Name] = $prop.Value }
+
+                if (-not $authShouldWrite) {
+                    if (-not $authObject.ContainsKey($ModelProvider)) {
+                        $authShouldWrite = $true
+                    } else {
+                        $providerAuth = $authObject[$ModelProvider]
+                        $providerKey = $null
+                        if ($providerAuth -and $providerAuth.PSObject.Properties["key"]) {
+                            $providerKey = $providerAuth.PSObject.Properties["key"].Value
+                        }
+                        if (-not $providerKey) { $authShouldWrite = $true }
+                    }
+                }
+            } else {
+                $authShouldWrite = $true
+            }
+        } catch {
+            $authShouldWrite = $true
+            $authObject = @{}
+        }
+    }
+
+    if ($authShouldWrite) {
+        $authObject[$ModelProvider] = @{ type = "api_key"; key = $ModelApiKey }
+        $authObject | ConvertTo-Json -Depth 5 | Out-File -FilePath $authFile -Encoding UTF8
         Write-Ok "auth.json written with model API key"
     } else {
-        Write-Ok "auth.json already exists - skipping (use -Force to overwrite)"
+        Write-Ok "auth.json already has $ModelProvider key - skipping (use -Force to overwrite)"
     }
 }
 
@@ -232,25 +343,52 @@ if (-not $SkipNpmInstall) {
 } else { Write-Status "Step 2: Skipped" }
 
 $profilePath = Join-Path $PsHome "Profile.ps1"
-$profileHasPiWrapper = (Test-Path $profilePath) -and (Select-String -Path $profilePath -Pattern 'function\s+pi\s*\{' -Quiet -ErrorAction SilentlyContinue)
-if (-not $profileHasPiWrapper) {
-    $profileBlock = @'
+$profileBlock = @'
 # pi-win: run pi from the machine-wide agent directory so AGENTS.md loads.
 function pi {
+    $machinePath = [System.Environment]::GetEnvironmentVariable("PATH", "Machine")
+    $userPath = [System.Environment]::GetEnvironmentVariable("PATH", "User")
+    $pathParts = @($machinePath, $userPath, $env:PATH) | Where-Object { $_ }
+    $env:PATH = ($pathParts -join ";")
+
     $piInstallPath = [System.Environment]::GetEnvironmentVariable("PI_CODING_AGENT_DIR", "Machine")
     if (-not $piInstallPath) { $piInstallPath = "C:\ProgramData\pi-win" }
+    $env:PI_CODING_AGENT_DIR = $piInstallPath
+
+    $piCommand = Get-Command pi.cmd -ErrorAction SilentlyContinue
+    if (-not $piCommand) {
+        throw "pi.cmd not found after refreshing PATH from Machine and User environment"
+    }
+
     Push-Location $piInstallPath
     try {
-        pi.cmd @args
+        & $piCommand.Source @args
     } finally {
         Pop-Location
     }
 }
 '@
+
+$profileUpdated = $false
+if (Test-Path $profilePath) {
+    $profileText = Get-Content $profilePath -Raw -ErrorAction SilentlyContinue
+    $profilePattern = '(?ms)^# pi-win: run pi from the machine-wide agent directory so AGENTS\.md loads\.\r?\nfunction pi \{.*?^\}\r?\n?'
+    $profileMatch = [regex]::Match($profileText, $profilePattern)
+    if ($profileMatch.Success) {
+        $replacement = $profileBlock.TrimEnd() + [Environment]::NewLine
+        $newProfileText = $profileText.Remove($profileMatch.Index, $profileMatch.Length).Insert($profileMatch.Index, $replacement)
+        Set-Content -Path $profilePath -Value $newProfileText -Encoding UTF8
+        $profileUpdated = $true
+        Write-Ok "PowerShell all-users profile wrapper updated at $profilePath"
+    }
+}
+
+$profileHasPiWrapper = (Test-Path $profilePath) -and (Select-String -Path $profilePath -Pattern 'function\s+pi\s*\{' -Quiet -ErrorAction SilentlyContinue)
+if ((-not $profileUpdated) -and (-not $profileHasPiWrapper)) {
     Add-Content -Path $profilePath -Value $profileBlock -Encoding UTF8
     Write-Ok "PowerShell all-users profile wraps pi at $profilePath"
 } else {
-    Write-Ok "PowerShell all-users profile already wraps pi"
+    if (-not $profileUpdated) { Write-Ok "PowerShell all-users profile already wraps pi" }
 }
 
 # -- Step 3: Sysinternals --
