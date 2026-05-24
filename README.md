@@ -36,6 +36,12 @@ Same model-key install as a single line:
 $s = irm https://raw.githubusercontent.com/shreeve1/pi-win/main/bin/install-pi-agent.ps1; & ([scriptblock]::Create($s)) -ModelProvider "zai" -ModelApiKey "your-model-key"
 ```
 
+To rotate only the Zai API key without forcing a repo reinstall:
+
+```powershell
+$s = irm https://raw.githubusercontent.com/shreeve1/pi-win/main/bin/install-pi-agent.ps1; & ([scriptblock]::Create($s)) -ModelProvider "zai" -ModelApiKey "your-new-model-key" -ForceAuth
+```
+
 Or keep keys in a local `.env` file that is never committed:
 
 ```powershell
@@ -62,6 +68,21 @@ To update an existing install (preserves `artifacts/` and `.env`, skips Node/npm
 ```powershell
 C:\ProgramData\pi-win\bin\update-pi.ps1
 ```
+
+To force a full reinstall from GitHub when running the bootstrap again:
+
+```powershell
+$s = irm https://raw.githubusercontent.com/shreeve1/pi-win/main/bin/install-pi-agent.ps1; & ([scriptblock]::Create($s)) -Force
+```
+
+To force reinstall and set the Zai API key in one line:
+
+```powershell
+$s = irm https://raw.githubusercontent.com/shreeve1/pi-win/main/bin/install-pi-agent.ps1; & ([scriptblock]::Create($s)) -Force -ModelProvider "zai" -ModelApiKey "your-model-key"
+```
+
+Use `-Force` when you need installed repo files refreshed, not just missing pieces filled in.
+Use `-ForceAuth` when you only need to overwrite the stored model API key.
 
 The installer handles:
 - Node.js 22.14.0 LTS (silent MSI)

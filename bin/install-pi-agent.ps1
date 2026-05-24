@@ -19,14 +19,23 @@
     # Or pass a model key in one line from RMM:
     $s = irm https://raw.githubusercontent.com/shreeve1/pi-win/main/bin/install-pi-agent.ps1; & ([scriptblock]::Create($s)) -ModelProvider "zai" -ModelApiKey "your-llm-key"
 
+    # Or rotate only the model key without forcing a repo reinstall:
+    $s = irm https://raw.githubusercontent.com/shreeve1/pi-win/main/bin/install-pi-agent.ps1; & ([scriptblock]::Create($s)) -ModelProvider "zai" -ModelApiKey "your-llm-key" -ForceAuth
+
     # Or load keys from a local .env file:
     #   MODEL_PROVIDER=zai
     #   MODEL_API_KEY=your-llm-key
     #   SERPER_API_KEY=your-serper-key
     .\install-pi-agent.ps1 -EnvFile "C:\ProgramData\pi-win\.env"
 
-    # Force re-download of the repo:
+    # Force full re-download/update of installed repo files:
     .\install-pi-agent.ps1 -Force
+
+    # Force full reinstall from GitHub in one line:
+    $s = irm https://raw.githubusercontent.com/shreeve1/pi-win/main/bin/install-pi-agent.ps1; & ([scriptblock]::Create($s)) -Force
+
+    # Force full reinstall and set Zai model key in one line:
+    $s = irm https://raw.githubusercontent.com/shreeve1/pi-win/main/bin/install-pi-agent.ps1; & ([scriptblock]::Create($s)) -Force -ModelProvider "zai" -ModelApiKey "your-llm-key"
 #>
 param(
     [string]$InstallPath  = "C:\ProgramData\pi-win",
@@ -38,6 +47,7 @@ param(
     [string]$EnvFile      = "",      # Optional .env file with MODEL_PROVIDER, MODEL_API_KEY, SERPER_API_KEY
     [switch]$SkipNode,
     [switch]$SkipNpmInstall,
+    [switch]$ForceAuth,
     [switch]$Force
 )
 $ErrorActionPreference = "Continue"
@@ -227,7 +237,7 @@ if (Test-Path $activeEnvFile) {
 # -- auth.json setup (LLM provider key) --
 if ($ModelApiKey) {
     $authFile = Join-Path $InstallPath "auth.json"
-    $authShouldWrite = $Force -or -not (Test-Path $authFile)
+    $authShouldWrite = $Force -or $ForceAuth -or -not (Test-Path $authFile)
     $authObject = @{}
 
     if (Test-Path $authFile) {
@@ -263,7 +273,7 @@ if ($ModelApiKey) {
         $authObject | ConvertTo-Json -Depth 5 | Out-File -FilePath $authFile -Encoding UTF8
         Write-Ok "auth.json written with model API key"
     } else {
-        Write-Ok "auth.json already has $ModelProvider key - skipping (use -Force to overwrite)"
+        Write-Ok "auth.json already has $ModelProvider key - skipping (use -ForceAuth to overwrite key only, or -Force to reinstall)"
     }
 }
 
