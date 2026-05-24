@@ -23,12 +23,33 @@ Run this one-liner from your RMM's inline script runner — no file upload neede
 irm https://raw.githubusercontent.com/shreeve1/pi-win/main/bin/install-pi-agent.ps1 | iex
 ```
 
-To inject a Serper API key at deploy time:
+To inject keys at deploy time:
 
 ```powershell
 $s = irm https://raw.githubusercontent.com/shreeve1/pi-win/main/bin/install-pi-agent.ps1
-& ([scriptblock]::Create($s)) -SerperApiKey "your-key-here"
+& ([scriptblock]::Create($s)) -ModelProvider "zai" -ModelApiKey "your-model-key" -SerperApiKey "your-serper-key"
 ```
+
+Same model-key install as a single line:
+
+```powershell
+$s = irm https://raw.githubusercontent.com/shreeve1/pi-win/main/bin/install-pi-agent.ps1; & ([scriptblock]::Create($s)) -ModelProvider "zai" -ModelApiKey "your-model-key"
+```
+
+Or keep keys in a local `.env` file that is never committed:
+
+```powershell
+@'
+MODEL_PROVIDER=zai
+MODEL_API_KEY=your-model-key
+SERPER_API_KEY=your-serper-key
+'@ | Out-File -FilePath "C:\ProgramData\pi-win.env" -Encoding UTF8
+
+$s = irm https://raw.githubusercontent.com/shreeve1/pi-win/main/bin/install-pi-agent.ps1
+& ([scriptblock]::Create($s)) -EnvFile "C:\ProgramData\pi-win.env"
+```
+
+For fresh installs, keep the source `.env` outside `C:\ProgramData\pi-win` until after the installer downloads the repo. Remove that source file after install if you do not want a plaintext key copy outside `auth.json`.
 
 Or if you prefer to deploy the folder manually first:
 
@@ -47,7 +68,8 @@ The installer handles:
 - `@earendil-works/pi-coding-agent` (global npm)
 - Sysinternals toolkit (9 tools, ~3.9 MB)
 - Nmap 7.92 portable (~22 MB zip, no installer, no registry)
-- Web search extension (requires `SERPER_API_KEY` in `.env`)
+- Local `.env` loading for `MODEL_PROVIDER`, `MODEL_API_KEY`, provider-specific keys like `ZAI_API_KEY`, and `SERPER_API_KEY`
+- Web search extension (requires `SERPER_API_KEY` in `.env` or deploy-time key injection)
 
 Verification output is written to `artifacts/investigations/install-log.md`.
 
@@ -120,7 +142,7 @@ To use a different AI provider, add an entry to `models.json` and update `settin
 "defaultModel": "gpt-4o"
 ```
 
-Then deploy with `-ModelProvider openai -ModelApiKey "your-key"` so `auth.json` is written correctly.
+Then deploy with `-ModelProvider openai -ModelApiKey "your-key"`, or set `MODEL_PROVIDER=openai` and `MODEL_API_KEY=your-key` in a local `.env` passed with `-EnvFile`, so `auth.json` is written correctly.
 | `auth.json` | Encrypted API key (gitignored) |
 | `.env` | `SERPER_API_KEY` for web search (gitignored) |
 | `agents/investigator.md` | Custom agent: Windows diagnostics expert, read-only phase 1 |
