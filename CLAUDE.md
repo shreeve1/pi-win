@@ -47,6 +47,34 @@ Built-in: PS 5.1 cmdlets, netstat, tasklist, sc.exe, reg.exe, wmic (deprecated),
 Sysinternals (bin\\ dir, -accepteula): pslist64, PsService64, PsInfo64, autorunsc64, tcpvcon64, handle64, sigcheck64, psloglist64, Listdlls64
 Nmap (bin\\nmap\\): nmap.exe, ncat.exe, nping.exe -- portable zip (7.92), no Npcap (connect scan only)
 
+## Skills
+
+Available via `/skill:<name>` (auto-discovered from `skills/`):
+
+**Investigation (read-only, Phase 1):**
+- `sys-intake` -- problem intake/triage (start here)
+- `sys-recon` -- baseline (hardware, OS, processes, startup)
+- `sys-network` -- adapters, DNS, connections, firewall
+- `sys-security` -- persistence, suspicious processes, security events
+- `sys-software` -- installed programs, drivers, GPO
+- `sys-performance` -- CPU, memory, disk, boot time
+- `sys-ad` -- domain, DC, Kerberos, GPO
+- `sys-nmap` -- port/host scans (connect scan only)
+- `dev-diagnose` -- deep-dive root-cause loop when sys-* skills can't pin it
+
+**Reporting / planning (Phase 2):**
+- `sys-report` -- consolidated findings + remediation plan (output format aligned with `dev-build`)
+- `dev-plan` -- structured remediation plan with `[N.M]` task IDs, `[SAFE]/[MODERATE]/[RISKY]` tags, rollback per step
+
+**Execution (Phase 4, post-APPROVE):**
+- `dev-build` -- sequential execution of a plan with logging, plan-hash tamper check, elevation check, full reverse-order rollback on failure
+
+**Cross-cutting:**
+- `handoff` -- compact session into a doc so another agent/shift can resume
+- `sys-cleanup` -- temp files, orphan processes, diagnostic state reset (always run at end)
+
+`dev-plan` and `dev-build` use a strict `[N.M]` task / `[T.N.M]` verification ID format -- `sys-report` follows the same format so its output feeds `dev-build` directly. APPROVE must include the plan filename: `APPROVE <plan-basename>`.
+
 ## Output
 artifacts/investigations/ -- reports, logs
 artifacts/scout-reports/ -- recon summaries

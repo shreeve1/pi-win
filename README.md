@@ -130,8 +130,26 @@ The installer sets `PI_CODING_AGENT_DIR` machine-wide to `C:\ProgramData\pi-win`
 | `sys-performance` | CPU, memory, disk I/O, pagefile, boot time |
 | `sys-ad` | Domain membership, DC connectivity, Kerberos, time sync |
 | `sys-nmap` | Network scanning (connect scan only — no Npcap) |
-| `sys-report` | Consolidated findings + remediation plan with approval gate |
+| `sys-report` | Consolidated findings + remediation plan with approval gate (output format aligned with `dev-plan`/`dev-build`) |
 | `sys-cleanup` | Temp file removal, orphan process cleanup, state reset |
+| `handoff` | Compact current session into a handoff doc so another agent or shift can pick up the work |
+| `dev-diagnose` | Disciplined diagnosis loop for hard bugs / perf regressions — reproduce, hypothesise, instrument. Stops at Phase 5 for APPROVE gate |
+| `dev-plan` | Build a structured remediation plan with `[SAFE]/[MODERATE]/[RISKY]` tags, rollback per step, PowerShell preflight checks |
+| `dev-build` | Execute an APPROVED remediation plan sequentially with logging, plan-hash tamper check, elevation check, full reverse-order rollback on failure |
+
+### Pipeline
+
+```
+sys-intake -> sys-* (recon/network/security/software/perf/ad/nmap) -> sys-report OR dev-plan
+                                                                              |
+                                                                         [APPROVE <plan>]
+                                                                              |
+                                                                          dev-build
+                                                                              |
+                                                                         sys-cleanup
+```
+
+`dev-diagnose` slots in between `sys-*` skills when one of them can't pin root cause. `handoff` writes a resume doc at any pause point.
 
 ## Extensions
 
