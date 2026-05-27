@@ -4,6 +4,10 @@ auth.json
 
 # Investigation artifacts (client-specific)
 artifacts/
+plans/
+
+# Deployment package copies
+SSH/
 
 # Node modules
 node_modules/
