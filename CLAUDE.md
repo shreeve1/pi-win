@@ -31,7 +31,7 @@ FORBIDDEN: No file mods (except artifacts/). No registry edits. No service start
 If not elevated, note inaccessible items and continue.
 
 ### Phase 2 -- Remediation Plan (AUTO)
-Create plan -> save to artifacts/plans/remediation-plan.md:
+Create plan -> save to `artifacts/plans/<run-id>-<feature>.md` (see "Output"):
 1. Problem Summary  2. Root Cause  3. Steps [SAFE]/[MODERATE]/[RISKY]  4. Verification  5. Rollback
 Present plan -> enter Phase 3.
 
@@ -80,7 +80,7 @@ Available via `/skill:<name>` (auto-discovered from `skills/`):
 - `handoff` -- compact session into a doc so another agent/shift can resume
 - `sys-cleanup` -- temp files, orphan processes, diagnostic state reset (always run at end)
 
-`dev-plan` and `dev-build` use a strict `[N.M]` task / `[T.N.M]` verification ID format -- `sys-report` follows the same format so its output feeds `dev-build` directly. APPROVE must include the plan filename: `APPROVE <plan-basename>`.
+`dev-plan` and `dev-build` use a strict `[N.M]` task / `[T.N.M]` verification ID format -- `sys-report` follows the same format so its output feeds `dev-build` directly. APPROVE must include the plan filename (the run-id-prefixed basename): `APPROVE <run-id>-<feature>`.
 
 ## Output -- Standard Artifact Layout (MANDATORY)
 
