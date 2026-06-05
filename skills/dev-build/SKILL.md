@@ -1,6 +1,6 @@
 ---
 name: dev-build
-description: Execute an APPROVED remediation plan on a Windows workstation, sequentially, one task at a time, with rollback on failure. Reads plans produced by dev-plan (or sys-report). Logs every action to artifacts/investigations/execution-log.md. Use ONLY after the technician has typed APPROVE in pi-win Phase 3.
+description: Execute an APPROVED remediation plan on a Windows workstation, sequentially, one task at a time, with rollback on failure. Reads plans produced by dev-plan (or sys-report). Logs every action to the run's logs/execution-log.md. Use ONLY after the technician has typed APPROVE in pi-win Phase 3.
 ---
 
 # Dev Build
@@ -29,9 +29,10 @@ sys-* investigation -> dev-plan -> [APPROVE] -> dev-build -> [verify] -> /skill:
 
 ## Variables
 
-- `PATH_TO_PLAN` - explicit path or auto-discovered
+- `PATH_TO_PLAN` - explicit path or auto-discovered (plan filenames are `<run-id>-<feature>.md`)
 - `PLAN_DIRECTORIES` - `artifacts\plans\`
-- `LOG_PATH` - `artifacts\investigations\execution-log.md`
+- `RUN` - the current investigation run dir (resolve via `.current-run`, see AGENTS.md "Output")
+- `LOG_PATH` - `$RUN\logs\execution-log.md` (derive `<run-id>` from the plan filename prefix, or read `.current-run`)
 
 ## Pre-flight
 

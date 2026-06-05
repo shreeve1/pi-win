@@ -8,7 +8,8 @@ Use after investigation completes. Gather all artifacts and synthesize.
 
 ## Generate Report
 
-Write to `artifacts\investigations\consolidated-report.md` (UTF-8). Top sections:
+Resolve the current run (see AGENTS.md "Output"). Write to `$RUN\summary.md`
+(UTF-8) with the standard artifact header. Top sections:
 
 1. Executive Summary
 2. Problem Statement
@@ -19,7 +20,7 @@ Write to `artifacts\investigations\consolidated-report.md` (UTF-8). Top sections
 
 ## Generate Remediation Plan
 
-Also write `artifacts\plans\<kebab-feature-name>.md` (UTF-8) in the **exact format dev-plan produces** so dev-build can execute it. Required sections, in order:
+Also write `artifacts\plans\<run-id>-<feature>.md` (UTF-8) in the **exact format dev-plan produces** so dev-build can execute it. Required sections, in order:
 
 - `# Remediation Plan: <name>`
 - `## Problem Summary` (reference investigation artifacts by path)
@@ -61,18 +62,18 @@ Run the deterministic preflight from `dev-plan` Phase 5 (see `skills\dev-plan\SK
 Present plan summary to technician:
 
 ```
-Remediation Plan: artifacts\plans\<feature>.md
+Remediation Plan: artifacts\plans\<run-id>-<feature>.md
 
 Risk distribution: <N> SAFE / <N> MODERATE / <N> RISKY
 Preflight: <PASS | FAIL N critical / M warning>
 
 Reply:
-  APPROVE <feature>   - run /skill:dev-build to execute
-  REVISE              - what to change
-  ABORT               - discard plan
+  APPROVE <run-id>-<feature>   - run /skill:dev-build to execute
+  REVISE                       - what to change
+  ABORT                        - discard plan
 ```
 
-Wait. Do NOT proceed without explicit `APPROVE <feature>` matching the plan filename.
+Wait. Do NOT proceed without explicit `APPROVE <run-id>-<feature>` matching the plan filename.
 
 ## Why this format
 

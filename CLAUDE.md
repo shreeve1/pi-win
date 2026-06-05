@@ -2,15 +2,22 @@
 
 You are a Windows workstation investigation agent running on a client PC via an RMM tool.
 
-## VSA RMM Pi Package
+## RMM Package Distribution
 
-- RMM Pi package and install script live on VSA at `D:\Kaseya\WebPages\ManagedFiles\VSASharedFiles\Applications\pi\bin`.
-- Use `/home/itadmin/itainfra` to access the VSA system when updating `D:\Kaseya\WebPages\ManagedFiles\VSASharedFiles\Applications\pi\` and the installer.
-- VSA host is `KASEYA2019` at `172.16.20.7`.
-- SSH from `/home/itadmin/itainfra` with `ssh administrator@172.16.20.7`.
-- Infra docs: `/home/itadmin/itainfra/hosts/kaseya2019.md` and `/home/itadmin/itainfra/services/kaseya-vsa.md`.
-- Confirmed on 2026-05-23: target bin path exists and had 3 items.
-- Before updating VSA package files, inspect current contents and make a backup/rollback copy.
+Site-specific deployment values (RMM server host/IP, package share path, infra
+repo location, admin account) are environment-specific. Do NOT hardcode them in
+this tracked file. Keep them in an untracked `DEPLOYMENT.local.md` (gitignored)
+or your infrastructure management repo, using these placeholders:
+
+- RMM Pi package and install script live on the RMM server at `<RMM_PACKAGE_PATH>`
+  (the RMM managed-files / shared-applications share).
+- Access the RMM server via your infrastructure repo at `<INFRA_REPO_PATH>` when
+  updating the package and installer.
+- RMM server: `<RMM_SERVER_HOST>` at `<RMM_SERVER_IP>`.
+- SSH: `ssh <RMM_ADMIN_USER>@<RMM_SERVER_IP>`.
+- Infra docs: `<INFRA_REPO_PATH>/hosts/<rmm-server>.md`.
+- Before updating package files on the RMM server, inspect current contents and
+  make a backup/rollback copy.
 
 ## Mandatory 4-Phase Workflow
 
@@ -32,7 +39,7 @@ Present plan -> enter Phase 3.
 STOP. Ask: APPROVE to execute, REVISE to modify, ABORT to cancel. NEVER proceed without APPROVE.
 
 ### Phase 4 -- Execution (AUTO after approval)
-Execute step by step. Log actions. Stop on failure. Write log to artifacts/investigations/execution-log.md.
+Execute step by step. Log actions. Stop on failure. Write log to the current run's `logs/execution-log.md` (see "Output" for the run layout).
 
 ## Elevation Check
 Run at session start:
@@ -75,10 +82,90 @@ Available via `/skill:<name>` (auto-discovered from `skills/`):
 
 `dev-plan` and `dev-build` use a strict `[N.M]` task / `[T.N.M]` verification ID format -- `sys-report` follows the same format so its output feeds `dev-build` directly. APPROVE must include the plan filename: `APPROVE <plan-basename>`.
 
-## Output
-artifacts/investigations/ -- reports, logs
-artifacts/scout-reports/ -- recon summaries
-artifacts/plans/ -- remediation plans
+## Output -- Standard Artifact Layout (MANDATORY)
+
+All investigation/exploration output is **run-scoped**. One investigation = one
+run directory. Nothing overwrites a prior run. Every skill writes into the
+current run dir, never to a fixed top-level filename.
+
+### Run directory
+
+```
+artifacts/investigations/<run-id>/
+  manifest.md             # run header + index of artifacts (updated as you go)
+  intake.md               # sys-intake: problem, triage, prerequisites
+  summary.md              # sys-report: consolidated findings
+  hosts/<host>/           # one dir per host (local = COMPUTERNAME; remote = hostname or IP)
+    recon.md              # sys-recon
+    network.md            # sys-network
+    security.md           # sys-security
+    software.md           # sys-software
+    performance.md        # sys-performance
+    ad.md                 # sys-ad
+  scans/                  # sys-nmap raw output (nmap-<target>-<kind>.txt/.xml/.gnmap)
+  logs/
+    execution-log.md      # dev-build / dev-diagnose Phase 4 action log
+    diag-*.log            # dev-diagnose scratch logs (removed at cleanup)
+  handoff-<UTC-ts>.md     # handoff docs
+
+artifacts/plans/<run-id>-<feature>.md   # remediation plans (APPROVE <run-id>-<feature>)
+```
+
+- **run-id** = `<UTC yyyyMMdd-HHmmss>-<slug>`. The slug is derived from the
+  intake problem (kebab-case, 2-4 words, e.g. `slow-boot`, `dns-resolution-fail`).
+- **No `scout-reports/`** -- recon now lives under `hosts/<host>/`.
+- Network exploration of multiple hosts creates one `hosts/<host>/` dir per host.
+
+### Resolve the current run (use at the top of any skill that writes output)
+
+Canonical method -- dot-source the shared helper, then use `$RUN` / `$HOSTDIR`:
+
+```powershell
+. bin\Resolve-Run.ps1 | Out-Null          # reuse current run (or create adhoc)
+# $RUN     = artifacts\investigations\<run-id>
+# $HOSTDIR = $RUN\hosts\<COMPUTERNAME>
+```
+
+`sys-intake` is the only skill that *starts* a run -- it passes the problem slug:
+
+```powershell
+. bin\Resolve-Run.ps1 -Slug 'slow-boot' | Out-Null   # new run, writes .current-run
+```
+
+All other skills call it with no `-Slug` and *read* the existing
+`.current-run` pointer. The pointer also lets a resumed/handed-off session find
+the active run deterministically. `bin\Resolve-Run.ps1` guarantees the standard
+subdirs (`hosts\`, `scans\`, `logs\`) and the per-host dir exist.
+
+If `bin\Resolve-Run.ps1` is unavailable, inline fallback:
+
+```powershell
+$root = 'artifacts\investigations'; $ptr = Join-Path $root '.current-run'
+if (Test-Path $ptr) { $runId = (Get-Content $ptr -Raw).Trim() }
+else {
+    $runId = '{0}-adhoc' -f ((Get-Date).ToUniversalTime().ToString('yyyyMMdd-HHmmss'))
+    New-Item -ItemType Directory -Path (Join-Path $root $runId) -Force | Out-Null
+    Set-Content -Path $ptr -Value $runId -Encoding UTF8
+}
+$RUN = Join-Path $root $runId
+$HOSTDIR = Join-Path $RUN ("hosts\" + $env:COMPUTERNAME)
+New-Item -ItemType Directory -Path $HOSTDIR -Force | Out-Null
+```
+
+### Standard artifact header
+
+Every `.md` artifact starts with this frontmatter so any host/finding is
+traceable to its run, host, and capture time:
+
+```
+---
+investigation: <run-id>
+host: <hostname or ip>
+captured: <UTC ISO-8601, e.g. 2026-06-05T14:32:10Z>
+skill: <skill name, e.g. sys-recon>
+elevated: <true|false>
+---
+```
 
 ## Silent Operation Rules (CRITICAL)
 

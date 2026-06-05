@@ -2,6 +2,9 @@
 auth.json
 .env
 
+# Site-specific deployment values (RMM server, paths, accounts)
+DEPLOYMENT.local.md
+
 # Investigation artifacts (client-specific)
 artifacts/
 plans/

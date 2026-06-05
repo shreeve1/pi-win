@@ -198,11 +198,23 @@ Then deploy with `-ModelProvider openai -ModelApiKey "your-key"`, or set `MODEL_
 
 ## Artifact Output
 
+Output is **run-scoped** — one investigation = one run directory, never
+overwritten. See the "Output" section in `CLAUDE.md` / `AGENTS.md` for the full
+spec and the run-resolver snippet.
+
 ```
 artifacts/
-├── investigations/    # Intake, execution logs, security analysis
-├── scout-reports/     # Baseline, network, software, performance, AD, nmap
-└── plans/             # Remediation plans (written in Phase 2, executed in Phase 4)
+├── investigations/
+│   └── <run-id>/                  # run-id = <UTC yyyyMMdd-HHmmss>-<slug>
+│       ├── manifest.md            # run header + artifact index
+│       ├── intake.md              # sys-intake
+│       ├── summary.md             # sys-report consolidated findings
+│       ├── hosts/<host>/          # recon, network, security, software, performance, ad
+│       ├── scans/                 # nmap raw output
+│       ├── logs/                  # execution-log.md, diag-*.log
+│       └── handoff-<ts>.md
+└── plans/
+    └── <run-id>-<feature>.md      # remediation plan (APPROVE <run-id>-<feature>)
 ```
 
 ## Known Limitations

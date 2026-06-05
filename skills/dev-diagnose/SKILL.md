@@ -104,11 +104,12 @@ Never "log everything and grep". Targeted only.
 **Tag every diagnostic artifact** with a unique prefix and timestamp:
 
 ```powershell
+# $RUN resolved from .current-run (see AGENTS.md "Output"); diag logs live in $RUN\logs
 $tag = "diag-$([guid]::NewGuid().ToString('N').Substring(0,6))"
-"$tag $(Get-Date -Format o) <message>" | Out-File -Append "artifacts\investigations\$tag.log" -Encoding UTF8
+"$tag $(Get-Date -Format o) <message>" | Out-File -Append "$RUN\logs\$tag.log" -Encoding UTF8
 ```
 
-Cleanup at the end is a single `Remove-Item artifacts\investigations\diag-*.log`.
+Cleanup at the end is a single `Remove-Item $RUN\logs\diag-*.log`.
 
 **Performance branch.** For perf regressions, logs are usually wrong. Establish a baseline measurement first, then bisect:
 
@@ -131,7 +132,7 @@ The plan you generate must include:
 4. **Rollback command** - what to run if the fix causes a new problem.
 5. **Cleanup** - which diagnostic artifacts to remove (`diag-*.log`, temp registry exports, etc.).
 
-Write the plan to `artifacts\plans\diagnose-<short-name>.md`. Reference the feedback loop, the confirmed hypothesis, and the test that will verify the fix.
+Write the plan to `artifacts\plans\<run-id>-diagnose-<short-name>.md`. Reference the feedback loop, the confirmed hypothesis, and the test that will verify the fix.
 
 ## Phase 6 - After approval (post-APPROVE only)
 
@@ -141,7 +142,7 @@ Only if the technician APPROVED in Phase 3 of the pi-win workflow:
 - [ ] Re-run the Phase 1 feedback loop. Confirm the bug no longer reproduces.
 - [ ] Run the regression test. Confirm pass.
 - [ ] Remove all `diag-*` diagnostic artifacts created during Phase 4.
-- [ ] Append outcome to `artifacts\investigations\execution-log.md`.
+- [ ] Append outcome to `$RUN\logs\execution-log.md`.
 
 Then ask: **what would have prevented this bug?** Note in the execution log if the root cause was:
 - A missing monitor (e.g. event log subscription)
@@ -153,6 +154,6 @@ Record the recommendation. Do NOT auto-implement.
 ## Constraints
 
 - Phase 1-4 are READ-ONLY. Per pi-win silent operation rules: no GUI tools, no notifications, no desktop visibility.
-- All diagnostic output goes to `artifacts\investigations\`.
+- All diagnostic output goes to the current run dir (`$RUN\logs\`, `$RUN\hosts\<host>\`).
 - Never access personal user data per project CLAUDE.md privacy rules.
 - If you discover evidence of active compromise during diagnosis: STOP, label `[CRITICAL-SECURITY]`, hand off to technician without remediation.

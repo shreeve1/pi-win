@@ -29,4 +29,5 @@ if (Test-Path bin\PsService64.exe) { bin\PsService64.exe -accepteula query }
 schtasks /query /fo CSV /nh | ConvertFrom-Csv | Where-Object {$_.TaskName -notlike "\\Microsoft\\*"} | Select-Object TaskName, Status
 Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run' -ErrorAction SilentlyContinue
 ```
-Save to artifacts/scout-reports/system-baseline.md.
+Resolve the current run (see AGENTS.md "Output") and save to
+`$HOSTDIR\recon.md` with the standard artifact header.
