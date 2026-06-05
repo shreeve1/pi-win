@@ -39,4 +39,6 @@ if (Test-Path bin\psloglist64.exe) { bin\psloglist64.exe -accepteula -o Security
 if (Test-Path bin\handle64.exe) { bin\handle64.exe -accepteula -s }
 if (Test-Path bin\tcpvcon64.exe) { bin\tcpvcon64.exe -accepteula -a -c } else { netstat -bno }
 ```
-Save to artifacts/investigations/security-analysis.md with severity ratings.
+Resolve the current run (see AGENTS.md "Output") and save to
+`$HOSTDIR\security.md` (with the standard artifact header) including severity
+ratings.

@@ -51,4 +51,5 @@ Get-WinEvent -FilterHashtable @{LogName='Application'; Level=2; StartTime=(Get-D
 Get-WinEvent -FilterHashtable @{LogName='System'; Level=2; StartTime=(Get-Date).AddHours(-24)} -ErrorAction SilentlyContinue | Select-Object TimeCreated, ProviderName, Id, Message
 if (Test-Path bin\psloglist64.exe) { bin\psloglist64.exe -accepteula -n 50 -f e }
 ```
-Save to artifacts/scout-reports/performance-profile.md.
+Resolve the current run (see AGENTS.md "Output") and save to
+`$HOSTDIR\performance.md` with the standard artifact header.

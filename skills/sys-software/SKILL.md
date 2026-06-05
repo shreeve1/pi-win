@@ -53,4 +53,5 @@ Get-CimInstance Win32_SoundDevice -ErrorAction SilentlyContinue | Select-Object 
 Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' | Select-Object ProductName, DisplayVersion, CurrentBuild, UBR
 if (Test-Path bin\PsInfo64.exe) { bin\PsInfo64.exe -accepteula -s -c }
 ```
-Save to artifacts/scout-reports/software-audit.md.
+Resolve the current run (see AGENTS.md "Output") and save to
+`$HOSTDIR\software.md` with the standard artifact header.

@@ -16,20 +16,21 @@ Write a handoff document summarising the current session so a fresh pi agent (or
 
 ## Output location
 
-Generate a deterministic filename in `artifacts/investigations/`:
+Write the handoff inside the current investigation run dir (see AGENTS.md
+"Output"). Resolve the run, then build a deterministic filename:
 
 ```powershell
-$timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$hostname = $env:COMPUTERNAME
-$path = "artifacts\investigations\handoff-$hostname-$timestamp.md"
-```
-
-If `artifacts\investigations\` does not exist, create it:
-
-```powershell
-if (-not (Test-Path 'artifacts\investigations')) {
-    New-Item -ItemType Directory -Path 'artifacts\investigations' -Force | Out-Null
+$root = 'artifacts\investigations'
+$ptr  = Join-Path $root '.current-run'
+if (Test-Path $ptr) { $runId = (Get-Content $ptr -Raw).Trim() }
+else {
+    $runId = '{0}-adhoc' -f ((Get-Date).ToUniversalTime().ToString('yyyyMMdd-HHmmss'))
+    New-Item -ItemType Directory -Path (Join-Path $root $runId) -Force | Out-Null
+    Set-Content -Path $ptr -Value $runId -Encoding UTF8
 }
+$RUN = Join-Path $root $runId
+$timestamp = (Get-Date).ToUniversalTime().ToString('yyyyMMdd-HHmmss')
+$path = Join-Path $RUN "handoff-$timestamp.md"
 ```
 
 Read the path before writing to confirm it doesn't already exist.
@@ -74,9 +75,10 @@ Write the file as UTF-8 (`Out-File -Encoding UTF8`) with this layout:
 ## What Has Been Done
 - <bulleted summary of investigation steps>
 - Reference existing artifacts by path, do NOT duplicate content:
-  - `artifacts/investigations/intake.md`
-  - `artifacts/scout-reports/<file>.md`
-  - `artifacts/plans/remediation-plan.md`
+  - `<run-dir>/intake.md`
+  - `<run-dir>/hosts/<host>/<domain>.md`
+  - `<run-dir>/summary.md`
+  - `artifacts/plans/<run-id>-<feature>.md`
 
 ## Current State
 - Open questions
@@ -109,7 +111,7 @@ Handoff written: <path>
 To resume in a new pi session:
   Set-Location 'C:\ProgramData\pi-win'
   pi
-  > Read artifacts\investigations\handoff-<host>-<timestamp>.md and continue from "Next Steps". Apply the 4-phase workflow from AGENTS.md.
+  > Read <run-dir>\handoff-<timestamp>.md and continue from "Next Steps". Apply the 4-phase workflow from AGENTS.md.
 ```
 
 ## Arguments

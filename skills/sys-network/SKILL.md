@@ -29,4 +29,5 @@ netsh winhttp show proxy
 ```
 ## Deep Network Scanning
 For port scanning, service detection, and host discovery, invoke the **sys-nmap** skill.
-Save to artifacts/scout-reports/network-diagnostics.md.
+Resolve the current run (see AGENTS.md "Output") and save to
+`$HOSTDIR\network.md` with the standard artifact header.

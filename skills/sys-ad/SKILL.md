@@ -28,4 +28,5 @@ Test-ComputerSecureChannel -Verbose -ErrorAction SilentlyContinue
 ```powershell
 whoami /all
 ```
-Save to artifacts/scout-reports/ad-diagnostics.md.
+Resolve the current run (see AGENTS.md "Output") and save to
+`$HOSTDIR\ad.md` with the standard artifact header.

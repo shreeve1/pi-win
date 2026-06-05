@@ -25,7 +25,8 @@ Comes after any investigation. Comes before dev-build.
 
 - `USER_PROMPT` - the technician's framing of the remediation goal
 - `PLAN_DIR` - `artifacts\plans\` (the standard pi-win output location)
-- `SOURCE_DIRS` - search in this order: `artifacts\investigations\`, `artifacts\scout-reports\`, `artifacts\plans\`
+- `RUN` - the current investigation run dir (resolve via `.current-run`, see AGENTS.md "Output")
+- `SOURCE_DIRS` - the current run dir `$RUN` (recurse: `intake.md`, `summary.md`, `hosts\*\*.md`, `scans\`) plus prior plans in `artifacts\plans\`
 
 ## Pre-flight
 
@@ -49,13 +50,16 @@ From USER_PROMPT identify:
 
 If USER_PROMPT is a file path, read it directly.
 
-Otherwise, enumerate `.md` files in SOURCE_DIRS sorted by `LastWriteTime` descending:
+Otherwise, resolve the current run and enumerate its `.md` artifacts (recursing
+into `hosts\`), most-recent first:
 
 ```powershell
-Get-ChildItem -Path 'artifacts\investigations','artifacts\scout-reports','artifacts\plans' `
-    -Filter '*.md' -ErrorAction SilentlyContinue |
+$root = 'artifacts\investigations'
+$runId = (Get-Content (Join-Path $root '.current-run') -Raw).Trim()
+$RUN = Join-Path $root $runId
+Get-ChildItem -Path $RUN -Recurse -Filter '*.md' -ErrorAction SilentlyContinue |
     Sort-Object LastWriteTime -Descending |
-    Select-Object -First 10 FullName, LastWriteTime
+    Select-Object -First 15 FullName, LastWriteTime
 ```
 
 Ask the technician to confirm which artifacts are the source of truth for this plan. If they decline to pick, default to the most recent file per directory.
@@ -71,7 +75,7 @@ If USER_PROMPT is substantive OR Phase 2 attached source artifacts, skip.
 
 ### Phase 4 - Draft the plan
 
-Write to `artifacts\plans\<kebab-feature-name>.md` using the Plan Format below. Use UTF-8 encoding (`Out-File -Encoding UTF8`).
+Write to `artifacts\plans\<run-id>-<kebab-feature-name>.md` using the Plan Format below. Use UTF-8 encoding (`Out-File -Encoding UTF8`). Prefix the filename with the current run-id so the plan correlates to its investigation.
 
 ### Phase 5 - Deterministic preflight
 
@@ -97,7 +101,7 @@ Output the plan path and a summary block:
 ```
 Remediation Plan Created
 
-  File: artifacts\plans\<feature>.md
+  File: artifacts\plans\<run-id>-<feature>.md
   Topic: <one-line summary>
 
   Risk distribution:
@@ -117,7 +121,7 @@ Then STOP. Do not execute. Do not invoke dev-build. Wait for the technician.
 
 ## Plan Format
 
-Write to `artifacts\plans\<feature>.md`. Format is fixed - dev-build depends on the `[N.M]` task IDs and `[T.N.M]` verification IDs.
+Write to `artifacts\plans\<run-id>-<feature>.md`. Format is fixed - dev-build depends on the `[N.M]` task IDs and `[T.N.M]` verification IDs.
 
 ```md
 # Remediation Plan: <task name>
@@ -175,7 +179,7 @@ If any step fails OR acceptance criteria are not met after execution:
 
 1. Stop further steps immediately.
 2. Run rollback commands in REVERSE order of execution.
-3. Append failure details to `artifacts\investigations\execution-log.md`.
+3. Append failure details to `$RUN\logs\execution-log.md`.
 4. Hand off to /skill:handoff for escalation.
 
 ## Progress
@@ -205,6 +209,6 @@ If any step fails OR acceptance criteria are not met after execution:
 ## Instructions
 
 - If USER_PROMPT is missing, ask the technician to provide it.
-- Generate descriptive kebab-case filename from the plan's main topic (e.g. `spooler-crash-loop-fix.md`).
+- Generate descriptive kebab-case filename from the plan's main topic, prefixed with the run-id (e.g. `20260605-143022-slow-boot-spooler-crash-loop-fix.md`).
 - Match the Plan Format exactly — dev-build's checkbox flipping depends on `[N.M]` and `[T.N.M]` IDs.
 - Do NOT execute. Do NOT invoke dev-build. STOP at Phase 6.

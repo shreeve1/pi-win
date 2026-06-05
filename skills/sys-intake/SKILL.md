@@ -14,4 +14,19 @@ $tools = @('pslist64.exe','PsService64.exe','PsInfo64.exe','autorunsc64.exe','tc
 foreach ($t in $tools) { if (Test-Path "bin\$t") { Write-Host "Found: $t" } else { Write-Host "Missing: $t" } }
 if (Test-Path 'bin\nmap\nmap.exe') { Write-Host 'Found: nmap' } else { Write-Host 'Missing: nmap' }
 ```
-Save to artifacts/investigations/intake.md. Transition to relevant domain skill.
+## Establish the investigation run
+
+sys-intake OWNS the run-id. Derive a kebab-case slug (2-4 words) from the
+problem (e.g. `slow-boot`, `dns-resolution-fail`, `unknown-network-survey`),
+then start the run via the shared helper (it creates the dirs + `.current-run`
+pointer that every other skill reads):
+
+```powershell
+. bin\Resolve-Run.ps1 -Slug '<kebab-slug-from-problem>' | Out-Null
+# $RUN and $HOSTDIR are now set for the rest of the session.
+```
+
+Write `manifest.md` (run header) and `intake.md` into `$RUN`, both with the
+standard artifact header (see AGENTS.md "Output"). intake.md captures the
+problem, triage category, and prerequisite results. Then transition to the
+relevant domain skill.
