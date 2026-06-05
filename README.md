@@ -116,7 +116,26 @@ For admin access, RDP to the workstation, open an elevated PowerShell session, t
 pi
 ```
 
-The installer sets `PI_CODING_AGENT_DIR` machine-wide to `C:\ProgramData\pi-win`, so SYSTEM and elevated admin sessions share the same `auth.json`, skills, extensions, and artifacts. It also writes `C:\ProgramData\pi-win\AGENTS.md` from the repo's `CLAUDE.md`; this install-only file is not kept in the project repo. The AllUsersAllHosts PowerShell profile wrapper in `$PsHome\Profile.ps1` temporarily changes into the install directory before calling `pi.cmd`, which lets `AGENTS.md` load even when `pi` is started from another directory.
+The installer sets `PI_CODING_AGENT_DIR` machine-wide to `C:\ProgramData\pi-win`, so SYSTEM and elevated admin sessions share the same `auth.json`, skills, extensions, and artifacts. Pi loads its operating instructions from `AGENTS.md`; in the repo `AGENTS.md` is a symlink to `CLAUDE.md` (single source of truth, so Pi-from-repo and Claude Code share identical instructions), and the installer also materializes a real `C:\ProgramData\pi-win\AGENTS.md` copy on the client. The AllUsersAllHosts PowerShell profile wrapper in `$PsHome\Profile.ps1` temporarily changes into the install directory before calling `pi.cmd`, which lets `AGENTS.md` load even when `pi` is started from another directory.
+
+## Maintaining the Package (operators)
+
+This is an operator/maintainer task — the on-client agent never does it.
+
+The pi-win package and install script are distributed from your RMM server's
+managed-files / shared-applications share. Site-specific values (RMM server
+host/IP, package share path, infra repo, admin account) are environment-specific
+— keep them in an untracked `DEPLOYMENT.local.md` (gitignored), not in tracked
+files. Placeholders:
+
+- Package + installer path on the RMM server: `<RMM_PACKAGE_PATH>`
+- RMM server: `<RMM_SERVER_HOST>` at `<RMM_SERVER_IP>`; access via `ssh <RMM_ADMIN_USER>@<RMM_SERVER_IP>`
+- Infrastructure repo (for RMM-server access/docs): `<INFRA_REPO_PATH>`
+- Before updating package files on the RMM server, inspect current contents and make a backup/rollback copy.
+
+## Reference Docs
+
+- `docs/powershell-reference.md` — PowerShell 5.1 / WMI / Sysinternals / Nmap reference (read on demand; not inlined into the agent prompt)
 
 ## Skills
 
