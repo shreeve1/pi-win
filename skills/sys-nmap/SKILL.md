@@ -4,6 +4,20 @@ description: Network scanning with Nmap 7.92 portable - port discovery, service 
 ---
 # Sys Nmap
 
+## Authorization (READ FIRST)
+
+Scanning hosts other than the local machine is **out of scope by default** (see
+AGENTS.md "Scope & Authorization"). Before scanning any remote host or range:
+
+- Confirm the technician has **explicitly authorized** the specific target
+  host(s) / IP range for this engagement.
+- Record the authorization in the run's `manifest.md` (who, exact scope, date)
+  BEFORE running any scan.
+- Scan only within the authorized scope. Never broaden it on your own. Connect
+  scans are logged by targets and may trip IDS/EDR on the client's LAN.
+- Scanning `localhost` / the local machine's own config needs no extra
+  authorization.
+
 ## Limitations (READ FIRST)
 
 No Npcap driver installed. This means:
