@@ -57,13 +57,67 @@ $s = irm https://raw.githubusercontent.com/shreeve1/pi-win/main/bin/install-pi-a
 
 For fresh installs, keep the source `.env` outside `C:\ProgramData\pi-win` until after the installer downloads the repo. Remove that source file after install if you do not want a plaintext key copy outside `auth.json`.
 
+### DeepSeek deployment
+
+DeepSeek V4 Pro and V4 Flash are bundled in `models.json`. Pass `-ModelProvider deepseek` and the installer writes `auth.json` AND syncs `settings.json` (`defaultProvider` / `defaultModel`) in one shot — pi boots straight on DeepSeek with no manual edits. If `-ModelId` is omitted, the first model listed under the provider in `models.json` is chosen (currently `deepseek-v4-pro`); pass `-ModelId "deepseek-v4-flash"` to default to Flash instead.
+
+One-line install pinned to V4 Flash:
+
+```powershell
+$s = irm https://raw.githubusercontent.com/shreeve1/pi-win/main/bin/install-pi-agent.ps1; & ([scriptblock]::Create($s)) -ModelProvider "deepseek" -ModelId "deepseek-v4-flash" -ModelApiKey "your-deepseek-key"
+```
+
+One-line install pinned to V4 Pro:
+
+```powershell
+$s = irm https://raw.githubusercontent.com/shreeve1/pi-win/main/bin/install-pi-agent.ps1; & ([scriptblock]::Create($s)) -ModelProvider "deepseek" -ModelId "deepseek-v4-pro" -ModelApiKey "your-deepseek-key"
+```
+
+Rotate only the DeepSeek API key without forcing a repo reinstall:
+
+```powershell
+$s = irm https://raw.githubusercontent.com/shreeve1/pi-win/main/bin/install-pi-agent.ps1; & ([scriptblock]::Create($s)) -ModelProvider "deepseek" -ModelApiKey "your-new-deepseek-key" -ForceAuth
+```
+
+Force reinstall and set the DeepSeek API key in one line:
+
+```powershell
+$s = irm https://raw.githubusercontent.com/shreeve1/pi-win/main/bin/install-pi-agent.ps1; & ([scriptblock]::Create($s)) -Force -ModelProvider "deepseek" -ModelId "deepseek-v4-flash" -ModelApiKey "your-deepseek-key"
+```
+
+Or keep keys in a local `.env` file:
+
+```powershell
+@'
+MODEL_PROVIDER=deepseek
+MODEL_ID=deepseek-v4-flash
+MODEL_API_KEY=your-deepseek-key
+SERPER_API_KEY=your-serper-key
+'@ | Out-File -FilePath "C:\ProgramData\pi-win.env" -Encoding UTF8
+
+$s = irm https://raw.githubusercontent.com/shreeve1/pi-win/main/bin/install-pi-agent.ps1
+& ([scriptblock]::Create($s)) -EnvFile "C:\ProgramData\pi-win.env"
+```
+
+The installer also accepts a provider-specific key in `.env` — `DEEPSEEK_API_KEY=...` is picked up automatically when `MODEL_PROVIDER=deepseek` and `MODEL_API_KEY` is not set.
+
+After the first deploy, smoke-test from the client:
+
+```powershell
+cd C:\ProgramData\pi-win; pi
+# Inside pi: /model  -> confirm DeepSeek V4 Flash/Pro is selected
+# Run a small prompt to confirm reasoning + tool use round-trip
+```
+
+Both V4 IDs and the `https://api.deepseek.com` base URL are per DeepSeek's official OpenAI-compatible API ([api-docs.deepseek.com](https://api-docs.deepseek.com/)).
+
 Or if you prefer to deploy the folder manually first:
 
 ```powershell
 cd C:\ProgramData\pi-win\bin; .\install-pi-agent.ps1
 ```
 
-To update an existing install (preserves `artifacts/` and `.env`, skips Node/npm):
+To update an existing install (preserves `artifacts/`, `.env`, `settings.json`, `auth.json`, skips Node/npm):
 
 ```powershell
 C:\ProgramData\pi-win\bin\update-pi.ps1
@@ -89,7 +143,8 @@ The installer handles:
 - `@earendil-works/pi-coding-agent` (global npm)
 - Sysinternals toolkit (9 tools, ~3.9 MB)
 - Nmap 7.92 portable (~22 MB zip, no installer, no registry)
-- Local `.env` loading for `MODEL_PROVIDER`, `MODEL_API_KEY`, provider-specific keys like `ZAI_API_KEY`, and `SERPER_API_KEY`
+- Local `.env` loading for `MODEL_PROVIDER`, `MODEL_ID`, `MODEL_API_KEY`, provider-specific keys like `ZAI_API_KEY` or `DEEPSEEK_API_KEY`, and `SERPER_API_KEY`
+- Automatic `settings.json` sync (`defaultProvider` / `defaultModel`) so the deployed agent boots on the provider whose key was just injected
 - Web search extension (requires `SERPER_API_KEY` in `.env` or deploy-time key injection)
 
 Verification output is written to `artifacts/investigations/install-log.md`.
@@ -182,10 +237,10 @@ sys-intake -> sys-* (recon/network/security/software/perf/ad/nmap) -> sys-report
 | `settings.json` | Shell path, model, theme, extension loader |
 | `models.json` | AI provider and model definitions (swap to any compatible provider) |
 
-To use a different AI provider, add an entry to `models.json` and update `settings.json`:
+To add a new AI provider, append an entry to `models.json` (the bundled `zai` and `deepseek` blocks are the working precedent):
 
 ```json
-// models.json — add alongside the existing provider
+// models.json — add alongside existing providers
 "openai": {
   "baseUrl": "https://api.openai.com/v1",
   "api": "openai-chat",
@@ -194,13 +249,7 @@ To use a different AI provider, add an entry to `models.json` and update `settin
 }
 ```
 
-```json
-// settings.json — point to the new provider and model
-"defaultProvider": "openai",
-"defaultModel": "gpt-4o"
-```
-
-Then deploy with `-ModelProvider openai -ModelApiKey "your-key"`, or set `MODEL_PROVIDER=openai` and `MODEL_API_KEY=your-key` in a local `.env` passed with `-EnvFile`, so `auth.json` is written correctly.
+Then deploy with `-ModelProvider openai -ModelId "gpt-4o" -ModelApiKey "your-key"`, or set `MODEL_PROVIDER=openai`, `MODEL_ID=gpt-4o`, and `MODEL_API_KEY=your-key` in a local `.env` passed with `-EnvFile`. The installer writes the key to `auth.json` and syncs `settings.json` (`defaultProvider` / `defaultModel`) automatically — no manual `settings.json` edit needed.
 | `auth.json` | Encrypted API key (gitignored) |
 | `.env` | `SERPER_API_KEY` for web search (gitignored) |
 | `agents/investigator.md` | Custom agent: Windows diagnostics expert, read-only phase 1 |

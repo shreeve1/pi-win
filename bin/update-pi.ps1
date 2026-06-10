@@ -65,10 +65,13 @@ try {
     $extracted = Get-ChildItem $tmpDir -Directory | Select-Object -First 1
     if (-not $extracted) { Write-Fail "Zip extraction produced no folder. Aborting."; exit 1 }
 
-    Write-Status "Syncing files (preserving artifacts/ and .env)..."
+    Write-Status "Syncing files (preserving artifacts/, .env, settings.json, auth.json)..."
     # /E  = include subdirs, /XD = exclude dirs, /XF = exclude files
     # /NFL /NDL /NJH /NJS /NC /NS = suppress robocopy's verbose output
-    $rc = robocopy $extracted.FullName $InstallPath /E /XD artifacts /XF .env /NFL /NDL /NJH /NJS /NC /NS
+    # settings.json and auth.json are installer-managed per-deployment state;
+    # excluding them stops updates from clobbering defaultProvider/defaultModel
+    # or wiping API keys. models.json IS updated so new bundled models propagate.
+    $rc = robocopy $extracted.FullName $InstallPath /E /XD artifacts /XF .env settings.json auth.json /NFL /NDL /NJH /NJS /NC /NS
     # Robocopy exit codes 0-7 are success/info; 8+ are errors
     if ($LASTEXITCODE -ge 8) {
         Write-Fail "robocopy reported errors (exit $LASTEXITCODE)"
@@ -77,7 +80,7 @@ try {
     }
 
     Write-Status ""
-    Write-Ok "UPDATE COMPLETE - artifacts/ and .env preserved"
+    Write-Ok "UPDATE COMPLETE - artifacts/, .env, settings.json, auth.json preserved"
     Write-Host "  cd $InstallPath ; pi" -ForegroundColor White
 
 } catch {
