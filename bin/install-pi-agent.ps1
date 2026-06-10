@@ -41,10 +41,11 @@ param(
     [string]$InstallPath  = "C:\ProgramData\pi-win",
     [string]$GitHubRepo   = "shreeve1/pi-win",
     [string]$Branch       = "main",
-    [string]$ModelProvider = "zai",  # provider name (zai, openai, anthropic, etc.)
+    [string]$ModelProvider = "zai",  # provider name (zai, deepseek, openai, anthropic, etc.)
+    [string]$ModelId      = "",      # model id within the provider (e.g. glm-5.1, deepseek-v4-flash); default = first model in models.json for the provider
     [string]$ModelApiKey  = "",      # FILL IN before pasting into RMM (LLM provider key -> auth.json)
     [string]$SerperApiKey = "",      # FILL IN before pasting into RMM (Serper web search -> .env)
-    [string]$EnvFile      = "",      # Optional .env file with MODEL_PROVIDER, MODEL_API_KEY, SERPER_API_KEY
+    [string]$EnvFile      = "",      # Optional .env file with MODEL_PROVIDER, MODEL_ID, MODEL_API_KEY, SERPER_API_KEY
     [switch]$SkipNode,
     [switch]$SkipNpmInstall,
     [switch]$ForceAuth,
@@ -225,6 +226,11 @@ if (Test-Path $activeEnvFile) {
         }
     }
 
+    if (-not $ModelId -and $envValues.ContainsKey("MODEL_ID") -and $envValues["MODEL_ID"]) {
+        $ModelId = $envValues["MODEL_ID"]
+        $loadedEnvKeys += "MODEL_ID"
+    }
+
     if ((-not $SerperApiKey) -and $envValues.ContainsKey("SERPER_API_KEY") -and $envValues["SERPER_API_KEY"]) {
         $SerperApiKey = $envValues["SERPER_API_KEY"]
         $loadedEnvKeys += "SERPER_API_KEY"
@@ -279,6 +285,53 @@ if ($ModelApiKey) {
         Write-Ok "auth.json written with model API key"
     } else {
         Write-Ok "auth.json already has $ModelProvider key - skipping (use -ForceAuth to overwrite key only, or -Force to reinstall)"
+    }
+}
+
+# -- settings.json sync (defaultProvider / defaultModel) --
+# Keep settings.json in step with -ModelProvider so pi boots on the provider
+# whose key was just written to auth.json. If -ModelId not supplied, pick the
+# first model id declared for the provider in models.json.
+$settingsFile = Join-Path $InstallPath "settings.json"
+$modelsFile   = Join-Path $InstallPath "models.json"
+if ((Test-Path $settingsFile) -and (Test-Path $modelsFile)) {
+    try {
+        $settingsObj = Get-Content $settingsFile -Raw | ConvertFrom-Json -ErrorAction Stop
+        $modelsObj   = Get-Content $modelsFile   -Raw | ConvertFrom-Json -ErrorAction Stop
+
+        $providerNode = $null
+        if ($modelsObj.providers -and $modelsObj.providers.PSObject.Properties[$ModelProvider]) {
+            $providerNode = $modelsObj.providers.PSObject.Properties[$ModelProvider].Value
+        }
+
+        if (-not $providerNode) {
+            Write-Warn "models.json has no '$ModelProvider' provider - settings.json not touched"
+        } else {
+            $resolvedModelId = $ModelId
+            if (-not $resolvedModelId) {
+                if ($providerNode.models -and $providerNode.models.Count -gt 0) {
+                    $resolvedModelId = $providerNode.models[0].id
+                }
+            } else {
+                $known = @($providerNode.models | ForEach-Object { $_.id })
+                if ($known -notcontains $resolvedModelId) {
+                    Write-Warn "ModelId '$resolvedModelId' not declared under provider '$ModelProvider' in models.json (writing anyway)"
+                }
+            }
+
+            $currentProvider = $settingsObj.defaultProvider
+            $currentModel    = $settingsObj.defaultModel
+            if (($currentProvider -ne $ModelProvider) -or ($resolvedModelId -and $currentModel -ne $resolvedModelId)) {
+                $settingsObj.defaultProvider = $ModelProvider
+                if ($resolvedModelId) { $settingsObj.defaultModel = $resolvedModelId }
+                Write-Utf8NoBom $settingsFile (($settingsObj | ConvertTo-Json -Depth 10))
+                Write-Ok "settings.json synced: defaultProvider=$ModelProvider, defaultModel=$($settingsObj.defaultModel)"
+            } else {
+                Write-Ok "settings.json already aligned with $ModelProvider / $currentModel - no change"
+            }
+        }
+    } catch {
+        Write-Warn "settings.json sync skipped: $($_.Exception.Message)"
     }
 }
 
