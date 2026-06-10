@@ -53,6 +53,8 @@ param(
 )
 $ErrorActionPreference = "Continue"
 $skipNmap = $false
+$RequiredNodeVersion = "22.19.0"
+$NodeDownloadVersion = "22.19.0"
 
 function Write-Status($m) { Write-Host "[PI] $m" -ForegroundColor Cyan }
 function Write-Ok($m)     { Write-Host "[OK] $m"   -ForegroundColor Green }
@@ -64,6 +66,17 @@ function Refresh-Path {
                 [System.Environment]::GetEnvironmentVariable("PATH","User")
 }
 function Test-Cmd($n) { try { Get-Command $n -ErrorAction Stop | Out-Null; $true } catch { $false } }
+function Get-NodeVersion {
+    if (-not (Test-Cmd node)) { return $null }
+    $raw = (node --version 2>$null)
+    if (-not $raw) { return $null }
+    try { return [version]($raw.Trim().TrimStart("v")) } catch { return $null }
+}
+function Test-NodeVersionReady {
+    $nodeVersion = Get-NodeVersion
+    if (-not $nodeVersion) { return $false }
+    return ($nodeVersion -ge [version]$RequiredNodeVersion)
+}
 
 function Write-Utf8NoBom($Path, $Content) {
     $encoding = New-Object System.Text.UTF8Encoding($false)
@@ -354,12 +367,16 @@ if ($SerperApiKey) {
 if (-not $SkipNode) {
     Write-Status "Step 1: Node.js"
     Refresh-Path
-    if ((Test-Cmd node) -and -not $Force) {
+    if ((Test-NodeVersionReady) -and -not $Force) {
         Write-Ok "Node.js already installed: $(node --version 2>$null)"
     } else {
-        $nodeUrl = "https://nodejs.org/dist/v22.14.0/node-v22.14.0-x64.msi"
+        $existingNodeVersion = Get-NodeVersion
+        if ($existingNodeVersion) {
+            Write-Warn "Node.js v$existingNodeVersion found; Pi 0.75.0+ requires >= v$RequiredNodeVersion. Upgrading."
+        }
+        $nodeUrl = "https://nodejs.org/dist/v$NodeDownloadVersion/node-v$NodeDownloadVersion-x64.msi"
         $msi     = "$env:TEMP\node-install.msi"
-        Write-Status "Downloading Node.js LTS..."
+        Write-Status "Downloading Node.js $NodeDownloadVersion LTS..."
         try {
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
             Invoke-WebRequest -Uri $nodeUrl -OutFile $msi -UseBasicParsing -TimeoutSec 120
@@ -367,24 +384,28 @@ if (-not $SkipNode) {
         } catch {
             Write-Fail "Download failed: $($_.Exception.Message)"
             if (Test-Cmd choco) { choco install nodejs-lts -y --no-progress; Refresh-Path }
-            if (-not (Test-Cmd node)) { Write-Fail "Cannot install Node.js. Aborting."; exit 1 }
+            if (-not (Test-NodeVersionReady)) { Write-Fail "Cannot install Node.js >= v$RequiredNodeVersion. Aborting."; exit 1 }
         }
         if (Test-Path $msi) {
             Write-Status "Installing silently..."
             Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /qn /norestart ADDLOCAL=ALL" -Wait -PassThru -NoNewWindow
             Remove-Item $msi -Force -ErrorAction SilentlyContinue
             Refresh-Path
-            if (Test-Cmd node) { Write-Ok "Node.js $(node --version 2>$null) installed" }
+            if (Test-NodeVersionReady) { Write-Ok "Node.js $(node --version 2>$null) installed" }
             else {
                 $env:PATH = "C:\Program Files\nodejs;$env:PATH"
-                if (Test-Cmd node) { Write-Ok "Node.js found after PATH fix" }
-                else { Write-Fail "Node.js not found. Aborting."; exit 1 }
+                if (Test-NodeVersionReady) { Write-Ok "Node.js found after PATH fix" }
+                else { Write-Fail "Node.js >= v$RequiredNodeVersion not found. Aborting."; exit 1 }
             }
         }
     }
     if (Test-Cmd npm) { Write-Ok "npm $(npm --version 2>$null)" }
     else { Write-Fail "npm missing"; exit 1 }
-} else { Write-Status "Step 1: Skipped" }
+} else {
+    Write-Status "Step 1: Skipped"
+    Refresh-Path
+    if (-not (Test-NodeVersionReady)) { Write-Fail "Node.js >= v$RequiredNodeVersion required before installing Pi 0.75.0+. Aborting."; exit 1 }
+}
 
 # -- Step 2: Pi Coding Agent --
 if (-not $SkipNpmInstall) {

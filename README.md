@@ -117,7 +117,7 @@ Or if you prefer to deploy the folder manually first:
 cd C:\ProgramData\pi-win\bin; .\install-pi-agent.ps1
 ```
 
-To update an existing install (preserves `artifacts/`, `.env`, `settings.json`, `auth.json`, skips Node/npm):
+To update an existing install (preserves `artifacts/`, `.env`, `settings.json`, `auth.json`; upgrades Node.js if below Pi's minimum):
 
 ```powershell
 C:\ProgramData\pi-win\bin\update-pi.ps1
@@ -139,7 +139,7 @@ Use `-Force` when you need installed repo files refreshed, not just missing piec
 Use `-ForceAuth` when you only need to overwrite the stored model API key.
 
 The installer handles:
-- Node.js 22.14.0 LTS (silent MSI)
+- Node.js 22.19.0 or newer (silent MSI)
 - `@earendil-works/pi-coding-agent` (global npm)
 - Sysinternals toolkit (9 tools, ~3.9 MB)
 - Nmap 7.92 portable (~22 MB zip, no installer, no registry)
