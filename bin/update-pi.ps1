@@ -79,6 +79,18 @@ try {
         Write-Ok "Files synced (robocopy exit $LASTEXITCODE)"
     }
 
+    # Pi loads its operating instructions from AGENTS.md. In the repo AGENTS.md
+    # is a symlink to CLAUDE.md, but GitHub zip extraction yields a real file
+    # that can drift from CLAUDE.md if the symlink target changed between
+    # commits. Re-materialize AGENTS.md from CLAUDE.md for parity with the
+    # installer's behaviour.
+    $sourceAgentFile    = Join-Path $InstallPath "CLAUDE.md"
+    $installedAgentFile = Join-Path $InstallPath "AGENTS.md"
+    if (Test-Path $sourceAgentFile) {
+        Copy-Item -Path $sourceAgentFile -Destination $installedAgentFile -Force
+        Write-Ok "AGENTS.md refreshed from CLAUDE.md"
+    }
+
     Write-Status ""
     Write-Ok "UPDATE COMPLETE - artifacts/, .env, settings.json, auth.json preserved"
     Write-Host "  cd $InstallPath ; pi" -ForegroundColor White
