@@ -227,14 +227,36 @@ sys-intake -> sys-* (recon/network/security/software/perf/ad/nmap) -> sys-report
 
 ## Extensions
 
+- **session-audit-logger** — Writes local JSONL audit logs for pi session lifecycle events, summarized prompts/messages/tool calls, command-result metadata, model changes, and approval text seen by the session
 - **powershell-bash** — Replaces the default bash tool with PowerShell 5.1 (`-NoProfile -Command`), necessary since the pi agent assumes a Unix shell
 - **web-fetch** — Adds `web_search` (Google via Serper API) and `web_fetch` (HTML-to-markdown) for researching error codes and known issues
+
+## AI Session Audit Logs
+
+`session-audit-logger` is enabled by default in `settings.json`. It writes local-only audit artifacts under `PI_CODING_AGENT_DIR` (normally `C:\ProgramData\pi-win`):
+
+```
+artifacts/sessions/<pi-session-id>/
+├── audit.jsonl         # append-only event stream, one JSON record per line
+└── audit-summary.md    # session metadata and event counts
+```
+
+The logger captures session lifecycle, raw input events, expanded prompt events, assistant/user/tool message metadata, tool calls/results metadata, PowerShell command metadata, provider response status, model/thinking changes, compaction/tree events, and `/audit-log` command use. By default, prompt text, message content, tool output, command text, and provider request payloads are summarized with lengths and hashes instead of full content. Host/user values are hashed by default.
+
+Optional high-detail modes are environment-variable gated and should be enabled only when internal audit explicitly accepts the client-data risk:
+
+- `PI_AUDIT_CONTENT_PREVIEW=1` — include short redacted previews in summaries.
+- `PI_AUDIT_FULL_CONTENT=1` — include full prompt/message/tool content after best-effort redaction.
+- `PI_AUDIT_FULL_PROVIDER_PAYLOAD=1` — include full serialized provider request payload after best-effort redaction.
+- `PI_AUDIT_INCLUDE_HOST_USER=1` — include raw host/user values instead of hashes.
+
+Logging failures are swallowed so audit write problems do not break the AI session. Redaction is best-effort; full-content modes can still persist sensitive client data and should not be used by default on client systems.
 
 ## Configuration
 
 | File | Purpose |
 |------|---------|
-| `settings.json` | Shell path, model, theme, extension loader |
+| `settings.json` | Shell path, model, theme, extension loader, audit logger enablement |
 | `models.json` | AI provider and model definitions (swap to any compatible provider) |
 
 To add a new AI provider, append an entry to `models.json` (the bundled `zai` and `deepseek` blocks are the working precedent):
@@ -281,6 +303,8 @@ artifacts/
 │       ├── scans/                 # nmap raw output
 │       ├── logs/                  # execution-log.md, diag-*.log
 │       └── handoff-<ts>.md
+├── sessions/
+│   └── <pi-session-id>/           # AI session audit log + summary
 └── plans/
     └── <run-id>-<feature>.md      # remediation plan (APPROVE <run-id>-<feature>)
 ```
