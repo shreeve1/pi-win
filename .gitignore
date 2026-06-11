@@ -16,6 +16,10 @@ SSH/
 node_modules/
 extensions/*/node_modules/
 
+# Agent/tool caches
+.pi-lens/
+extensions/*/.pi-lens/
+
 # OS files
 .DS_Store
 Thumbs.db

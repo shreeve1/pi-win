@@ -18,12 +18,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { writeFileSync, unlinkSync } from "node:fs";
 
-function createPowerShellBashOps(cwd: string): BashOperations {
+function createPowerShellBashOps(): BashOperations {
 	return {
 		exec: (command, execCwd, { onData, signal, timeout }) =>
 			new Promise((resolve, reject) => {
 				// Write command to a temp .ps1 file to avoid quoting issues
-				const tmpFile = join(tmpdir(), `pi-cmd-${Date.now()}-${Math.random().toString(36).slice(2)}.ps1`);
+				const tmpFile = join(
+					tmpdir(),
+					`pi-cmd-${Date.now()}-${Math.random().toString(36).slice(2)}.ps1`,
+				);
 				// Prepend Set-Location so the command runs in the correct directory
 				const script = `Set-Location -LiteralPath '${execCwd.replace(/'/g, "''")}'\n${command}`;
 				writeFileSync(tmpFile, script, "utf8");
@@ -31,8 +34,10 @@ function createPowerShellBashOps(cwd: string): BashOperations {
 				const args = [
 					"-NoProfile",
 					"-NonInteractive",
-					"-ExecutionPolicy", "Bypass",
-					"-File", tmpFile,
+					"-ExecutionPolicy",
+					"Bypass",
+					"-File",
+					tmpFile,
 				];
 
 				const child = spawn("powershell.exe", args, {
@@ -54,7 +59,9 @@ function createPowerShellBashOps(cwd: string): BashOperations {
 
 				child.on("error", (e) => {
 					if (timer) clearTimeout(timer);
-					try { unlinkSync(tmpFile); } catch {}
+					try {
+						unlinkSync(tmpFile);
+					} catch {}
 					reject(e);
 				});
 
@@ -64,7 +71,9 @@ function createPowerShellBashOps(cwd: string): BashOperations {
 				child.on("close", (code) => {
 					if (timer) clearTimeout(timer);
 					signal?.removeEventListener("abort", onAbort);
-					try { unlinkSync(tmpFile); } catch {}
+					try {
+						unlinkSync(tmpFile);
+					} catch {}
 					if (signal?.aborted) reject(new Error("aborted"));
 					else if (timedOut) reject(new Error(`timeout:${timeout}`));
 					else resolve({ exitCode: code ?? 1 });
@@ -75,7 +84,7 @@ function createPowerShellBashOps(cwd: string): BashOperations {
 
 export default function (pi: ExtensionAPI) {
 	const cwd = process.cwd();
-	const psOps = createPowerShellBashOps(cwd);
+	const psOps = createPowerShellBashOps();
 	const psBashTool = createBashTool(cwd, { operations: psOps });
 
 	pi.registerTool({
@@ -87,7 +96,7 @@ export default function (pi: ExtensionAPI) {
 			"Optionally provide a timeout in seconds.",
 		promptGuidelines: [
 			"Use backslashes in paths: C:\\Windows not C:/Windows.",
-			"Quote paths with spaces: \"C:\\Program Files\\...\".",
+			'Quote paths with spaces: "C:\\Program Files\\...".',
 			"Use -Encoding UTF8 with Out-File and Set-Content for plain text.",
 			"Add -UseBasicParsing with Invoke-WebRequest.",
 			"Add -ErrorAction SilentlyContinue on commands that may fail.",
