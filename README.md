@@ -236,12 +236,16 @@ sys-intake -> sys-* (recon/network/security/software/perf/ad/nmap) -> sys-report
 `session-audit-logger` is enabled by default in `settings.json`. It writes local-only audit artifacts under `PI_CODING_AGENT_DIR` (normally `C:\ProgramData\pi-win`):
 
 ```
-artifacts/sessions/<pi-session-id>/
-├── audit.jsonl         # append-only event stream, one JSON record per line
-└── audit-summary.md    # session metadata and event counts
+artifacts/sessions/<UTC timestamp>/
+├── audit-actions.jsonl # append-only machine-readable action ledger
+├── audit-actions.md    # human-readable action report
+├── audit-summary.md    # session metadata, action counts, event counts
+└── audit-events.jsonl  # optional raw event stream; written only when PI_AUDIT_RAW_EVENTS=1
 ```
 
-The logger captures session lifecycle, raw input events, expanded prompt events, assistant/user/tool message metadata, tool calls/results metadata, PowerShell command metadata, provider response status, model/thinking changes, compaction/tree events, and `/audit-log` command use. By default, prompt text, message content, tool output, command text, and provider request payloads are summarized with lengths and hashes instead of full content. Host/user values are hashed by default.
+Session folder names use UTC timestamps like `20260611-211925-123Z`; Pi's original random session id is retained inside audit records as `piSessionId`. The primary audit output is an action ledger covering file reads, file writes, file edits, delete-risk shell commands, opaque shell commands, network/web access, provider requests/responses, and session lifecycle. By default, prompt text, message content, tool output, command text, and provider request payloads are summarized with lengths and hashes instead of full content. File paths and redacted shell commands are retained so a session can be audited for accessed and changed files. Host/user values are hashed by default.
+
+Path and command retention is a deliberate privacy/audit tradeoff: paths and redacted commands are logged by default because action auditing needs evidence of what was accessed or changed, but those strings can still include usernames, client names, case names, or other sensitive naming context.
 
 Optional high-detail modes are environment-variable gated and should be enabled only when internal audit explicitly accepts the client-data risk:
 
@@ -249,8 +253,10 @@ Optional high-detail modes are environment-variable gated and should be enabled 
 - `PI_AUDIT_FULL_CONTENT=1` — include full prompt/message/tool content after best-effort redaction.
 - `PI_AUDIT_FULL_PROVIDER_PAYLOAD=1` — include full serialized provider request payload after best-effort redaction.
 - `PI_AUDIT_INCLUDE_HOST_USER=1` — include raw host/user values instead of hashes.
+- `PI_AUDIT_FILE_HASHES=1` — add existence, byte count, and capped SHA-256 file proof metadata for built-in file tools; file contents are not logged.
+- `PI_AUDIT_RAW_EVENTS=1` — write the lower-level `audit-events.jsonl` event stream for debugging.
 
-Logging failures are swallowed so audit write problems do not break the AI session. Redaction is best-effort; full-content modes can still persist sensitive client data and should not be used by default on client systems.
+Logging failures are swallowed so audit write problems do not break the AI session. Redaction is best-effort; full-content modes can still persist sensitive client data and should not be used by default on client systems. PowerShell command classification is heuristic: common file operations such as `Remove-Item`, `Set-Content`, `Copy-Item`, and `Move-Item` are labeled, but arbitrary scripts can still have side effects that are not statically detectable from the command line alone.
 
 ## Configuration
 
@@ -304,7 +310,7 @@ artifacts/
 │       ├── logs/                  # execution-log.md, diag-*.log
 │       └── handoff-<ts>.md
 ├── sessions/
-│   └── <pi-session-id>/           # AI session audit log + summary
+│   └── <UTC timestamp>/           # AI action ledger, action report, summary, optional raw events
 └── plans/
     └── <run-id>-<feature>.md      # remediation plan (APPROVE <run-id>-<feature>)
 ```
