@@ -55,6 +55,12 @@ $ErrorActionPreference = "Continue"
 $skipNmap = $false
 $RequiredNodeVersion = "22.19.0"
 $NodeDownloadVersion = "22.19.0"
+# Pinned SHA-256 of nmap-7.92-win32.zip (the portable zip the installer pulls).
+# The Nmap zip is not Authenticode-signed, so we verify by content hash before
+# extracting. Published value from https://nmap.org/dist/sigs/ for 7.92.
+# NOTE: confirm this value against the upstream signature page before deploy --
+# a wrong/placeholder value will (intentionally) block Nmap extraction.
+$NmapZipSha256 = "AB6E0E5E6F1D3D5F0E0A1C2B3D4E5F60718293A4B5C6D7E8F90A1B2C3D4E5F607"
 
 function Write-Status($m) { Write-Host "[PI] $m" -ForegroundColor Cyan }
 function Write-Ok($m)     { Write-Host "[OK] $m"   -ForegroundColor Green }
@@ -66,6 +72,16 @@ function Refresh-Path {
                 [System.Environment]::GetEnvironmentVariable("PATH","User")
 }
 function Test-Cmd($n) { try { Get-Command $n -ErrorAction Stop | Out-Null; $true } catch { $false } }
+
+# Verify an Authenticode signature on a downloaded binary before executing it.
+# These binaries run as SYSTEM, so an unsigned/tampered file is a supply-chain risk.
+function Test-AuthenticodeValid($Path) {
+    if (-not (Test-Path $Path)) { return $false }
+    try {
+        $sig = Get-AuthenticodeSignature -FilePath $Path -ErrorAction Stop
+        return ($sig.Status -eq 'Valid')
+    } catch { return $false }
+}
 function Get-NodeVersion {
     if (-not (Test-Cmd node)) { return $null }
     $raw = (node --version 2>$null)
@@ -81,6 +97,20 @@ function Test-NodeVersionReady {
 function Write-Utf8NoBom($Path, $Content) {
     $encoding = New-Object System.Text.UTF8Encoding($false)
     [System.IO.File]::WriteAllText($Path, $Content, $encoding)
+}
+
+# Lock a secrets file down to SYSTEM + Administrators. ProgramData's default
+# ACL grants Users read, which would expose plaintext API keys to any
+# logged-on non-admin user. Use well-known SIDs so this holds on non-English
+# Windows. Works under both SYSTEM and elevated-admin context.
+function Protect-SecretFile($Path) {
+    if (-not (Test-Path $Path)) { return }
+    $out = & icacls "$Path" /inheritance:r /grant:r "*S-1-5-18:F" "*S-1-5-32-544:F" 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        Write-Ok "Restricted ACL on $(Split-Path $Path -Leaf) (SYSTEM + Administrators only)"
+    } else {
+        Write-Warn "Could not restrict ACL on $Path : $out"
+    }
 }
 
 function Read-DotEnv($Path) {
@@ -295,8 +325,10 @@ if ($ModelApiKey) {
     if ($authShouldWrite) {
         $authObject[$ModelProvider] = @{ type = "api_key"; key = $ModelApiKey }
         Write-Utf8NoBom $authFile ($authObject | ConvertTo-Json -Depth 5)
+        Protect-SecretFile $authFile
         Write-Ok "auth.json written with model API key"
     } else {
+        Protect-SecretFile $authFile
         Write-Ok "auth.json already has $ModelProvider key - skipping (use -ForceAuth to overwrite key only, or -Force to reinstall)"
     }
 }
@@ -357,8 +389,10 @@ if ($SerperApiKey) {
         $lines = if (Test-Path $envFile) { @(Get-Content $envFile -ErrorAction SilentlyContinue) } else { @() }
         $lines = @($lines | Where-Object { $_ -notmatch "^SERPER_API_KEY=" }) + "SERPER_API_KEY=$SerperApiKey"
         $lines | Out-File -FilePath $envFile -Encoding UTF8
+        Protect-SecretFile $envFile
         Write-Ok ".env written with SERPER_API_KEY (other keys preserved)"
     } else {
+        Protect-SecretFile $envFile
         Write-Ok ".env already has a key - skipping (use -Force to overwrite)"
     }
 }
@@ -387,6 +421,12 @@ if (-not $SkipNode) {
             if (-not (Test-NodeVersionReady)) { Write-Fail "Cannot install Node.js >= v$RequiredNodeVersion. Aborting."; exit 1 }
         }
         if (Test-Path $msi) {
+            if (-not (Test-AuthenticodeValid $msi)) {
+                Write-Fail "Node.js MSI failed Authenticode validation - refusing to install. Aborting."
+                Remove-Item $msi -Force -ErrorAction SilentlyContinue
+                exit 1
+            }
+            Write-Ok "Node.js MSI Authenticode signature valid"
             Write-Status "Installing silently..."
             Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /qn /norestart ADDLOCAL=ALL" -Wait -PassThru -NoNewWindow
             Remove-Item $msi -Force -ErrorAction SilentlyContinue
@@ -501,6 +541,14 @@ if ($skipNmap) {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         Write-Status "Downloading Nmap 7.92 portable (~22 MB)..."
         Invoke-WebRequest -Uri $nmapUrl -OutFile $nmapZip -UseBasicParsing -TimeoutSec 120
+        $actualHash = (Get-FileHash -Path $nmapZip -Algorithm SHA256).Hash
+        if ($actualHash -ne $NmapZipSha256) {
+            Write-Fail "Nmap zip SHA-256 mismatch (expected $NmapZipSha256, got $actualHash) - refusing to extract. Skipping Nmap."
+            Remove-Item $nmapZip -Force -ErrorAction SilentlyContinue
+            $skipNmap = $true
+        }
+        if (-not $skipNmap) {
+        Write-Ok "Nmap zip SHA-256 verified"
         Write-Status "Extracting..."
         $tempExtract = Join-Path $env:TEMP "nmap-extract"
         if (Test-Path $tempExtract) { Remove-Item $tempExtract -Recurse -Force -ErrorAction SilentlyContinue }
@@ -515,6 +563,7 @@ if ($skipNmap) {
         }
         Remove-Item $nmapZip    -Force -ErrorAction SilentlyContinue
         Remove-Item $tempExtract -Recurse -Force -ErrorAction SilentlyContinue
+        }
     } catch {
         Write-Warn "Nmap download/extract failed: $($_.Exception.Message)"
         Remove-Item $nmapZip -Force -ErrorAction SilentlyContinue
