@@ -62,6 +62,29 @@ function stringParam(value: unknown): string | undefined {
 	return typeof value === "string" ? value : undefined;
 }
 
+// Block SSRF against the client LAN. The agent runs as SYSTEM, so private,
+// loopback, and link-local targets (esp. the 169.254.169.254 metadata IP) must
+// be refused before a fetch is attempted.
+function isBlockedHost(hostname: string): boolean {
+	const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+	if (host === "localhost" || host.endsWith(".localhost")) return true;
+	if (host.includes(":")) {
+		if (host === "::1" || host === "::") return true;
+		if (host.startsWith("fe80:")) return true; // link-local
+		if (/^f[cd][0-9a-f]{2}:/.test(host)) return true; // unique-local fc00::/7
+		return false;
+	}
+	const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+	if (!m) return false;
+	const a = Number(m[1]);
+	const b = Number(m[2]);
+	if (a === 0 || a === 127 || a === 10) return true; // 0/8, loopback, 10/8
+	if (a === 172 && b >= 16 && b <= 31) return true; // 172.16/12
+	if (a === 192 && b === 168) return true; // 192.168/16
+	if (a === 169 && b === 254) return true; // 169.254/16 link-local
+	return false;
+}
+
 function numberParam(value: unknown): number | undefined {
 	return typeof value === "number" && Number.isFinite(value)
 		? value
@@ -181,6 +204,25 @@ export default function (pi: ExtensionAPI) {
 		) {
 			const url = stringParam(params.url);
 			if (!url) return textResult("Fetch error: url is required", true);
+
+			let parsed: URL;
+			try {
+				parsed = new URL(url);
+			} catch {
+				return textResult("Fetch error: invalid URL", true);
+			}
+			if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+				return textResult(
+					"Fetch blocked: only http(s) URLs are allowed",
+					true,
+				);
+			}
+			if (isBlockedHost(parsed.hostname)) {
+				return textResult(
+					`Fetch blocked: ${parsed.hostname} is a private, loopback, or link-local address`,
+					true,
+				);
+			}
 
 			try {
 				const timeout = (numberParam(params.timeout) || 30) * 1000;
