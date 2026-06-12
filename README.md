@@ -234,7 +234,7 @@ Logging failures are swallowed so audit write problems do not break the AI sessi
 |------|---------|
 | `settings.json` | Shell path, default provider/model, theme, extension loader, audit logger enablement |
 | `models.json` | AI provider and model definitions |
-| `auth.json` | Encrypted API keys (gitignored) |
+| `auth.json` | Provider API keys (plaintext JSON; ACL-restricted to SYSTEM/Administrators by the installer; gitignored) |
 | `.env` | Optional local deploy values such as `MODEL_PROVIDER`, `MODEL_ID`, `MODEL_API_KEY`, provider-specific keys, and `SERPER_API_KEY` (gitignored) |
 | `agents/investigator.md` | Custom agent: Windows diagnostics expert, read-only phase 1 |
 

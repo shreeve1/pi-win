@@ -10,7 +10,16 @@ foreach ($tool in $tools) {
     try {
         Write-Host "Downloading $tool..." -NoNewline
         Invoke-WebRequest -Uri $url -OutFile $outPath -UseBasicParsing -TimeoutSec 30
-        if (Test-Path $outPath) { $sizeKB = [math]::Round((Get-Item $outPath).Length / 1KB, 1); Write-Host " OK ($sizeKB KB)" -ForegroundColor Green; $downloaded++ }
+        if (Test-Path $outPath) {
+            $sizeKB = [math]::Round((Get-Item $outPath).Length / 1KB, 1); Write-Host " OK ($sizeKB KB)" -ForegroundColor Green; $downloaded++
+            # Sysinternals binaries are Authenticode-signed by Microsoft; these run
+            # as SYSTEM, so warn if the signature does not validate (possible MITM
+            # or tampered download). Logged WARN, not a hard failure.
+            $sig = Get-AuthenticodeSignature -FilePath $outPath -ErrorAction SilentlyContinue
+            if (-not $sig -or $sig.Status -ne 'Valid') {
+                Write-Host "   WARN: $tool Authenticode signature not valid ($(if ($sig) { $sig.Status } else { 'unknown' }))" -ForegroundColor Yellow
+            }
+        }
         else { Write-Host " FAILED" -ForegroundColor Red; $failed++ }
     } catch { Write-Host " FAILED ($($_.Exception.Message))" -ForegroundColor Red; $failed++ }
 }
