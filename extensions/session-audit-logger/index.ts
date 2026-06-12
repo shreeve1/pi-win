@@ -114,6 +114,9 @@ function redactString(value: string): string {
 		/\b(sk|pk|rk|ghp|gho|ghu|ghs|github_pat)_[A-Za-z0-9_-]{16,}\b/g,
 		"$1_[REDACTED]",
 	);
+	// Hyphen-style provider keys (DeepSeek/OpenAI: sk-...). The underscore rule
+	// above does not catch these, and deepseek is the default provider.
+	redacted = redacted.replace(/\bsk-[A-Za-z0-9]{20,}\b/g, "sk-[REDACTED]");
 	redacted = redacted.replace(/\bAKIA[0-9A-Z]{16}\b/g, "AKIA[REDACTED]");
 	redacted = redacted.replace(
 		/((?:api[_-]?key|access[_-]?token|refresh[_-]?token|token|secret|password|passwd|pwd|authorization|cookie|credential)\s*[:=]\s*["']?)([^"'\s,;]+)/gi,
@@ -451,6 +454,37 @@ function extractCommandPaths(command: string): string[] {
 	return [...paths].slice(0, 20).map(redactString);
 }
 
+// Read-only Sysinternals query tools shipped under the install bin\ dir.
+// Invoking these via an absolute path is legitimate recon, not opaque
+// execution, so they should not trip the external-executable-path heuristic.
+const READONLY_SYSINTERNALS = new Set([
+	"pslist64.exe",
+	"psservice64.exe",
+	"psinfo64.exe",
+	"autorunsc64.exe",
+	"tcpvcon64.exe",
+	"handle64.exe",
+	"sigcheck64.exe",
+	"psloglist64.exe",
+	"listdlls64.exe",
+]);
+
+const EXE_REF_RE =
+	/(?:["']?(?:[A-Za-z]:\\|\.\\|\.\/|\/)[^\s'"`|&;]+\.exe["']?)/gi;
+
+// True when every executable path in the command is a whitelisted read-only
+// Sysinternals tool under a bin\ directory.
+function onlyWhitelistedDiagnosticExes(command: string): boolean {
+	const exeRefs = command.match(EXE_REF_RE);
+	if (!exeRefs || exeRefs.length === 0) return false;
+	return exeRefs.every((ref) => {
+		const cleaned = ref.replace(/^["']|["']$/g, "");
+		if (!/[\\/]bin[\\/][^\\/]+\.exe$/i.test(cleaned)) return false;
+		const base = cleaned.split(/[\\/]/).pop()?.toLowerCase() ?? "";
+		return READONLY_SYSINTERNALS.has(base);
+	});
+}
+
 function opaqueShellReasons(command: string): string[] {
 	const reasons: string[] = [];
 	if (/-(?:encodedcommand|enc)\b/i.test(command))
@@ -475,7 +509,8 @@ function opaqueShellReasons(command: string): string[] {
 	if (
 		/(?:^|[\s&;|])(?:&\s*)?(?:["']?(?:[A-Za-z]:\\|\.\\|\.\/|\/)[^\s'"`|&;]+\.exe["']?)/i.test(
 			command,
-		)
+		) &&
+		!onlyWhitelistedDiagnosticExes(command)
 	) {
 		reasons.push("external-executable-path");
 	}
@@ -488,8 +523,13 @@ function classifyShellCommand(command: string): Record<string, unknown> {
 	const opaqueShell = riskReasons.length > 0;
 	const deleteRisk =
 		/\bremove-item\b/i.test(command) ||
+		/\bremove-itemproperty\b/i.test(command) ||
+		/\bclear-content\b/i.test(command) ||
 		/\b(del|erase|rmdir|rd)\b/i.test(command) ||
-		/(^|[\s;&|])rm\s+/i.test(command);
+		/(^|[\s;&|])r[im]\s+/i.test(command) ||
+		/\breg(?:\.exe)?\s+delete\b/i.test(command) ||
+		/\bsc(?:\.exe)?\s+delete\b/i.test(command) ||
+		/\b(?:stop|disable)-service\b/i.test(command);
 	const writeRisk =
 		!opaqueShell &&
 		(/\b(set-content|add-content|out-file|new-item|copy-item|move-item|rename-item)\b/i.test(
