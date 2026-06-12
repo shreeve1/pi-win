@@ -152,6 +152,36 @@ try {
         Write-Ok "AGENTS.md refreshed from CLAUDE.md"
     }
 
+    # Reconcile preserved settings.json against the freshly-synced models.json.
+    # settings.json is excluded from the sync, so a model id renamed/removed
+    # upstream can leave defaultModel pointing at a now-undefined model.
+    $settingsFile = Join-Path $InstallPath "settings.json"
+    $modelsFile   = Join-Path $InstallPath "models.json"
+    if ((Test-Path $settingsFile) -and (Test-Path $modelsFile)) {
+        try {
+            $settingsObj = Get-Content $settingsFile -Raw | ConvertFrom-Json -ErrorAction Stop
+            $modelsObj   = Get-Content $modelsFile   -Raw | ConvertFrom-Json -ErrorAction Stop
+            $dp = $settingsObj.defaultProvider
+            $dm = $settingsObj.defaultModel
+            $providerNode = $null
+            if ($dp -and $modelsObj.providers -and $modelsObj.providers.PSObject.Properties[$dp]) {
+                $providerNode = $modelsObj.providers.PSObject.Properties[$dp].Value
+            }
+            if (-not $providerNode) {
+                Write-Warn "settings.json defaultProvider '$dp' has no entry in models.json - set a valid provider before running pi"
+            } else {
+                $known = @($providerNode.models | ForEach-Object { $_.id })
+                if ($dm -and ($known -notcontains $dm)) {
+                    Write-Warn "settings.json defaultModel '$dm' no longer present under provider '$dp' in models.json (available: $($known -join ', ')) - update defaultModel before running pi"
+                } else {
+                    Write-Ok "settings.json defaultModel '$dm' resolves in models.json"
+                }
+            }
+        } catch {
+            Write-Warn "settings.json/models.json reconcile skipped: $($_.Exception.Message)"
+        }
+    }
+
     Write-Status ""
     Write-Ok "UPDATE COMPLETE - artifacts/, .env, settings.json, auth.json preserved"
     Write-Host "  cd $InstallPath ; pi" -ForegroundColor White
