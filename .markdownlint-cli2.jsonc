@@ -1,0 +1,11 @@
+// Standard style contract (dotfiles .config/style/template). Same rule set
+// pi-lens bundles (config/markdownlint/core.json): every default rule except
+// line length, and duplicate headings allowed when they are not siblings.
+// Markdown is linted, never auto-formatted.
+{
+  "config": {
+    "MD013": false,
+    "MD024": { "siblings_only": true }
+  },
+  "gitignore": true
+}
