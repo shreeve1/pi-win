@@ -1,0 +1,26 @@
+# Standard style contract: a copy of dotfiles .config/style/template/.editorconfig
+# (docs/adr/0022-one-style-contract.md there). pi-lens formats shell only when
+# this file exists and passes --use-editorconfig to biome; style-check reads
+# the same file. Change the dotfiles template, not one repo's copy, unless the
+# repo genuinely differs.
+root = true
+
+[*]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+charset = utf-8
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.py]
+indent_size = 4
+
+[*.md]
+trim_trailing_whitespace = false
+
+[Makefile]
+indent_style = tab
+
+[*.go]
+indent_style = tab
